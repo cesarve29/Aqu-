@@ -2,11 +2,11 @@
 """
 INSERT COIN: LA ULTIMA PARTIDA
 Video arcade retro de ~2 minutos generado 100% por codigo:
-pixel art 16-bit a 320x180, escalado x4 con efecto CRT (curvatura, scanlines,
+pixel art 16-bit a 320x180, escalado x6 (1080p) con efecto CRT (curvatura, scanlines,
 bloom, aberracion cromatica, glitches VHS) y banda sonora chiptune sintetizada.
 
 Uso:
-    python3 make_video.py                  -> last_game.mp4 (video completo)
+    python3 make_video.py                  -> last_game_1080p.mp4 (1920x1080, video completo)
     python3 make_video.py --stills 5 15 92 -> PNGs de esos segundos (para revisar)
 Requiere: numpy, Pillow, ffmpeg.
 """
@@ -20,7 +20,7 @@ import wave
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
-W, H, SCALE, FPS = 320, 180, 4, 24
+W, H, SCALE, FPS = 320, 180, 6, 24  # 320x180 x6 = 1920x1080
 DUR = 120.0
 SCENE = 10.0
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -1822,7 +1822,7 @@ def main():
             Image.fromarray(render_frame(n)).save(os.path.join(HERE, 'stills', 'frame_%06.2f.png' % float(s)))
         return
     wav = os.path.join(HERE, 'soundtrack.wav')
-    out = os.path.join(HERE, 'last_game.mp4')
+    out = os.path.join(HERE, 'last_game_1080p.mp4')
     print("Sintetizando banda sonora...")
     write_wav(wav, build_audio())
     total = int(DUR * FPS)
