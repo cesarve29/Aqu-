@@ -6,3 +6,5 @@ build.log
 timelapse_ciudad_1080p60.mp4
 timelapse_ciudad_parte*.mp4
 __pycache__/
+compress.log
+timelapse_nueva_santander.mp4
