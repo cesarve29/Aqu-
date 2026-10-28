@@ -776,10 +776,11 @@ def main():
             Image.fromarray(render_frame(n)).save(os.path.join(HERE, 'stills', 'frame_%06.2f.png' % float(s)))
         return
     total = int(ANA['dur'] * FPS)
+    master = os.path.join(HERE, 'master_tmp.mp4')
     cmd = ['ffmpeg', '-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24',
            '-s', '%dx%d' % (OW, OH), '-r', str(FPS), '-i', '-', '-i', AUDIO,
            '-c:v', 'libx264', '-preset', 'medium', '-crf', '22', '-pix_fmt', 'yuv420p',
-           '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', OUT]
+           '-c:a', 'aac', '-b:a', '192k', '-shortest', master]
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
     with mp.get_context('fork').Pool(os.cpu_count(), initializer=worker_init) as pool:
         for n, fr in enumerate(pool.imap(render_frame, range(total), chunksize=4)):
@@ -788,7 +789,22 @@ def main():
                 print('  %5.1fs / %.0fs' % (n / FPS, ANA['dur']), flush=True)
     proc.stdin.close()
     proc.wait()
+    compress(master)
     print('Listo:', OUT)
+
+
+def compress(master):
+    """El grano de pelicula dispara el peso: se suaviza y se codifica a 2 pasadas (<100 MB para GitHub)."""
+    print('Comprimiendo (2 pasadas)...')
+    base = ['ffmpeg', '-loglevel', 'error', '-y', '-i', master, '-vf', 'hqdn3d=3:3:6:6', '-c:v', 'libx264',
+            '-preset', 'slow', '-tune', 'film', '-b:v', '2900k', '-passlogfile', os.path.join(HERE, 'x264pass')]
+    subprocess.run(base + ['-pass', '1', '-an', '-f', 'null', os.devnull], check=True)
+    subprocess.run(base + ['-pass', '2', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '160k',
+                           '-movflags', '+faststart', OUT], check=True)
+    for f in os.listdir(HERE):
+        if f.startswith('x264pass'):
+            os.remove(os.path.join(HERE, f))
+    os.remove(master)
 
 
 if __name__ == '__main__':
