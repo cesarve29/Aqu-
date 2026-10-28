@@ -1,0 +1,8 @@
+segments/
+stills/
+events.json
+soundtrack.wav
+build.log
+timelapse_ciudad_1080p60.mp4
+timelapse_ciudad_parte*.mp4
+__pycache__/
