@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
 """
-ELECTRIC PULSE - lyric video 3D
-Video musical con letras generado 100% por codigo: motor 3D en software (proyeccion
-en perspectiva) con suelo de rejilla neon, ciudad wireframe, tunel de anillos,
-poliedros, rayos y campo de estrellas, todo reactivo al audio (bombo/graves/espectro).
-Las letras son tipografia extruida en 3D, con brillo neon, que entra palabra a palabra
-sincronizada con los tiempos incrustados en el .m4a y gira en el espacio.
+EchoBot - ELECTRIC PULSE (lyric video 3D)
+
+Mundo 3D por raymarching en GLSL (OpenGL via moderngl; en servidores sin GPU corre en
+llvmpipe bajo Xvfb): una megaciudad viva bajo la tormenta (calles mojadas con reflejos,
+miles de ventanas, coches voladores, rayos, torre de energia, ondas expansivas con el
+bombo) y un laberinto digital con laseres y estroboscopios para la segunda estrofa.
+Las letras son tipografia cinetica 3D animada letra a letra, sincronizada con los
+tiempos incrustados en el .m4a. Intro con artista + titulo. Sin ecualizador.
 
 Uso:
-    python3 make_video.py                  -> electric_pulse_1080p.mp4 (1920x1080, 30 fps)
-    python3 make_video.py --stills 5 25 60 -> PNGs de esos segundos en stills/ (para revisar)
-Requiere: numpy, Pillow, ffmpeg.
+    python3 make_video.py                     -> electric_pulse_1080p.mp4 (1920x1080, 30 fps, < 100 MB)
+    python3 make_video.py --stills 3 8 30 ...  -> PNGs en stills/ (segundos del video, intro incluida)
+Requiere: numpy, Pillow, moderngl, ffmpeg (y xvfb-run si no hay pantalla/EGL).
 """
-import colorsys
 import math
 import os
+import random
 import re
 import subprocess
 import sys
@@ -25,18 +27,25 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 W, H, FPS = 1920, 1080, 30
-RW, RH = 960, 540  # el mundo 3D se dibuja a media resolucion y se escala; el texto va a 1080p
+WORLD_W, WORLD_H = 1920, 1080
+SKY_W, SKY_H = 960, 540
 HERE = os.path.dirname(os.path.abspath(__file__))
-AUDIO = os.path.join(HERE, "electric_pulse.m4a")
+SONG = os.path.join(HERE, "electric_pulse.m4a")
+BUILD = os.path.join(HERE, "build")
+AUDIO = os.path.join(BUILD, "audio_full.wav")
+MASTER = os.path.join(BUILD, "master.mp4")
 OUT = os.path.join(HERE, "electric_pulse_1080p.mp4")
-FONT = "/usr/share/fonts/opentype/inter/InterDisplay-BlackItalic.otf"
-FONT_UI = "/usr/share/fonts/opentype/inter/InterDisplay-Bold.otf"
+FONTS = os.path.join(HERE, "fonts")
 SR = 22050
+
+ARTIST = "ECHOBOT"
+TITLE = "ELECTRIC PULSE"
+INTRO = 6.0  # segundos de intro antes de que arranque la cancion
 
 KEYWORDS = {
     "night", "neon", "dreams", "electric", "tides", "lights", "sky", "fly", "pulse",
-    "shake", "jolt", "veins", "revolt", "strobe-lit", "digital", "bassline", "circuit",
-    "sparks", "ignite", "right",
+    "shake", "jolt", "veins", "revolt", "strobe-lit", "digital", "maze", "bassline",
+    "circuit", "sparks", "ignite", "right", "collide", "burn",
 }
 
 
@@ -45,6 +54,11 @@ KEYWORDS = {
 # ----------------------------------------------------------------------------
 def clamp(x, a=0.0, b=1.0):
     return max(a, min(b, x))
+
+
+def smooth(t):
+    t = clamp(t)
+    return t * t * (3 - 2 * t)
 
 
 def ease_out(t):
@@ -57,38 +71,56 @@ def ease_in(t):
     return t ** 3
 
 
-def back_out(t, k=2.2):
+def back_out(t, k=2.0):
     t = clamp(t) - 1
     return 1 + (k + 1) * t ** 3 + k * t ** 2
 
 
-def smooth(t):
+def bounce_out(t):
     t = clamp(t)
-    return t * t * (3 - 2 * t)
+    n, d = 7.5625, 2.75
+    if t < 1 / d:
+        return n * t * t
+    if t < 2 / d:
+        t -= 1.5 / d
+        return n * t * t + 0.75
+    if t < 2.5 / d:
+        t -= 2.25 / d
+        return n * t * t + 0.9375
+    t -= 2.625 / d
+    return n * t * t + 0.984375
 
 
-def hsv(h, s=1.0, v=1.0):
-    r, g, b = colorsys.hsv_to_rgb(h % 1.0, s, v)
-    return (int(r * 255), int(g * 255), int(b * 255))
+def lerp(a, b, t):
+    return a + (b - a) * t
 
 
-def scale_col(c, k):
-    return tuple(int(clamp(v * k, 0, 255)) for v in c)
-
-
-def mixc(a, b, t):
-    t = clamp(t)
-    return tuple(int(x + (y - x) * t) for x, y in zip(a, b))
+def lerp3(a, b, t):
+    return tuple(lerp(x, y, t) for x, y in zip(a, b))
 
 
 # ----------------------------------------------------------------------------
-# letras (pista de subtitulos / metadato incrustado en el m4a)
+# audio: intro (extracto filtrado + subida de ruido) + cancion
 # ----------------------------------------------------------------------------
+def build_audio():
+    os.makedirs(BUILD, exist_ok=True)
+    fmt = "aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo"
+    fc = (
+        f"[0:a]atrim=30:{30 + INTRO},asetpts=PTS-STARTPTS,lowpass=f=420,lowpass=f=420,"
+        f"volume=1.6,afade=t=in:d=2.5,afade=t=out:st={INTRO - 0.35}:d=0.35,{fmt}[m];"
+        f"anoisesrc=d={INTRO}:c=pink:a=0.6,highpass=f=1800,"
+        f"afade=t=in:st=2.2:d={INTRO - 2.35},afade=t=out:st={INTRO - 0.15}:d=0.15,volume=0.22,{fmt}[n];"
+        f"[m][n]amix=inputs=2:normalize=0[intro];"
+        f"[0:a]{fmt}[song];[intro][song]concat=n=2:v=0:a=1[out]"
+    )
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", SONG, "-filter_complex", fc,
+                    "-map", "[out]", "-c:a", "pcm_s16le", AUDIO], check=True)
+
+
 def load_lyrics():
-    srt = subprocess.run(
-        ["ffmpeg", "-loglevel", "error", "-i", AUDIO, "-map", "0:s:0", "-f", "srt", "-"],
-        capture_output=True, text=True, check=True).stdout
-    items = []
+    srt = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", SONG, "-map", "0:s:0", "-f", "srt", "-"],
+                         capture_output=True, text=True, check=True).stdout
+    lines, section, count = [], "verse", {}
     for block in srt.strip().split("\n\n"):
         rows = block.strip().splitlines()
         if len(rows) < 3:
@@ -97,776 +129,789 @@ def load_lyrics():
         t0 = int(a[0]) * 3600 + int(a[1]) * 60 + int(a[2]) + int(a[3]) / 1000
         t1 = int(b[0]) * 3600 + int(b[1]) * 60 + int(b[2]) + int(b[3]) / 1000
         text = " ".join(rows[2:]).strip()
-        items.append((t0, t1, text))
-    lines, section = [], "verse"
-    for t0, t1, text in items:
         if text.startswith("["):
-            section = text.strip("[]").lower()
+            name = text.strip("[]").lower()
+            count[name] = count.get(name, 0) + 1
+            section = name if count[name] == 1 or name.endswith("2") else f"{name} 2"
             continue
-        lines.append({"t0": t0, "t1": t1, "text": text, "section": section})
+        lines.append({"t0": t0 + INTRO, "t1": t1 + INTRO, "text": text, "section": section})
     return lines
 
 
-# ----------------------------------------------------------------------------
-# analisis de audio
-# ----------------------------------------------------------------------------
 def analyze_audio(dur):
-    raw = subprocess.run(
-        ["ffmpeg", "-loglevel", "error", "-i", AUDIO, "-ac", "1", "-ar", str(SR), "-f", "f32le", "-"],
-        capture_output=True, check=True).stdout
+    raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", AUDIO, "-ac", "1", "-ar", str(SR), "-f", "f32le", "-"],
+                         capture_output=True, check=True).stdout
     a = np.frombuffer(raw, np.float32)
     n = int(dur * FPS) + 2
     win = 2048
     pad = np.concatenate([np.zeros(win), a, np.zeros(win)])
     hann = np.hanning(win)
     freqs = np.fft.rfftfreq(win, 1 / SR)
-    edges = np.geomspace(40, 9000, 33)
-    band_idx = [(np.searchsorted(freqs, edges[i]), max(np.searchsorted(freqs, edges[i + 1]), np.searchsorted(freqs, edges[i]) + 1)) for i in range(32)]
-    bass, rms, spec = np.zeros(n), np.zeros(n), np.zeros((n, 32))
+    lo = (freqs > 30) & (freqs < 150)
+    bass, rms = np.zeros(n), np.zeros(n)
     for i in range(n):
         c = int(i / FPS * SR) + win
         seg = pad[c - win // 2:c + win // 2]
         if len(seg) < win:
             continue
-        mag = np.abs(np.fft.rfft(seg * hann))
-        bass[i] = mag[(freqs > 30) & (freqs < 150)].sum()
+        bass[i] = np.abs(np.fft.rfft(seg * hann))[lo].sum()
         rms[i] = math.sqrt(float(np.mean(seg ** 2)))
-        spec[i] = [mag[x:y].mean() for x, y in band_idx]
-
-    def norm(v):
-        return np.clip(v / (np.percentile(v, 97) + 1e-9), 0, 1.3)
-
-    bass, rms = norm(bass), norm(rms)
-    spec = np.log1p(spec * 4)
-    spec = np.clip(spec / (np.percentile(spec, 98, axis=0) + 1e-9), 0, 1.2)
-    # bombo: subida brusca de graves con caida exponencial
+    bass = np.clip(bass / (np.percentile(bass, 97) + 1e-9), 0, 1.3)
+    rms = np.clip(rms / (np.percentile(rms, 97) + 1e-9), 0, 1.3)
     flux = np.maximum(0, np.diff(bass, prepend=bass[0]))
     flux = np.clip(flux / (np.percentile(flux, 98) + 1e-9), 0, 1.5)
+    kicks, last = [], -1.0
+    for i in range(n):
+        t = i / FPS
+        if flux[i] > 0.4 and t - last > 0.2 and t > INTRO - 0.05:
+            kicks.append(t)
+            last = t
     kick = np.zeros(n)
     for i in range(n):
-        kick[i] = max(flux[i] if flux[i] > 0.25 else 0, (kick[i - 1] if i else 0) * 0.80)
-    # suavizados
-    bass_s = np.convolve(bass, np.ones(5) / 5, mode="same")
-    energy = np.convolve(rms, np.ones(45) / 45, mode="same")
-    beats = np.cumsum(flux > 0.45)  # contador de golpes (semillas para rayos, etc.)
-    return {"bass": bass_s, "rms": rms, "kick": np.clip(kick, 0, 1.2), "spec": spec,
-            "energy": energy, "beats": beats}
+        kick[i] = max(flux[i] if flux[i] > 0.25 else 0, (kick[i - 1] if i else 0) * 0.82)
+    return {"bass": np.convolve(bass, np.ones(5) / 5, mode="same"), "kick": np.clip(kick, 0, 1.2),
+            "energy": np.convolve(rms, np.ones(45) / 45, mode="same"), "kicks": np.array(kicks)}
 
 
 # ----------------------------------------------------------------------------
-# guion visual por secciones
+# guion: secciones, paletas, camara
 # ----------------------------------------------------------------------------
+# neon 1, neon 2, niebla (lineal, para el shader)
 PALETTES = {
-    # neon principal, neon secundario, extrusion, cielo arriba, cielo horizonte
-    "verse":     ((0, 240, 255), (255, 40, 200), (40, 0, 90), (6, 0, 22), (70, 0, 110)),
-    "prechorus": ((255, 230, 60), (255, 40, 120), (80, 0, 60), (12, 0, 20), (130, 10, 80)),
-    "chorus":    ((255, 40, 200), (0, 255, 230), (60, 0, 110), (10, 0, 30), (90, 0, 140)),
-    "verse 2":   ((255, 120, 20), (255, 30, 90), (90, 10, 30), (16, 0, 10), (120, 20, 40)),
-    "outro":     ((120, 80, 255), (0, 240, 255), (30, 0, 90), (4, 0, 16), (50, 0, 100)),
+    "intro":       ((0.0, 0.85, 1.0), (1.0, 0.1, 0.65), (0.035, 0.012, 0.07)),
+    "verse":       ((0.0, 0.85, 1.0), (1.0, 0.1, 0.65), (0.045, 0.014, 0.08)),
+    "prechorus":   ((1.0, 0.55, 0.08), (1.0, 0.08, 0.3), (0.07, 0.02, 0.045)),
+    "chorus":      ((1.0, 0.12, 0.7), (0.1, 1.0, 0.85), (0.06, 0.012, 0.09)),
+    "verse 2":     ((1.0, 0.42, 0.04), (1.0, 0.08, 0.45), (0.03, 0.006, 0.02)),
+    "prechorus 2": ((0.75, 1.0, 0.1), (1.0, 0.1, 0.2), (0.025, 0.02, 0.012)),
+    "chorus 2":    ((0.2, 0.5, 1.0), (1.0, 0.78, 0.1), (0.02, 0.025, 0.08)),
+    "outro":       ((0.6, 0.3, 1.0), (0.0, 0.85, 1.0), (0.03, 0.02, 0.08)),
 }
+HALL = {"verse 2", "prechorus 2"}
 
 
-def build_timeline(lines, dur):
-    """Lista de (inicio, seccion). La ultima frase termina a ~106 s: despues, outro."""
-    sec = []
+def build_sections(lines, dur):
+    secs = [("intro", 0.0)]
     for ln in lines:
-        if not sec or sec[-1][1] != ln["section"]:
-            sec.append((ln["t0"], ln["section"]))
-    last = lines[-1]
-    sec.append((last["t1"] + 0.8, "outro"))
-    sec[0] = (0.0, sec[0][1])
-    return sec
-
-
-def section_weights(t, timeline, fade=0.9):
-    """Pesos suaves por seccion (crossfade alrededor de cada cambio)."""
-    w = {}
-    for i, (st, name) in enumerate(timeline):
-        en = timeline[i + 1][0] if i + 1 < len(timeline) else 1e9
-        a = smooth((t - st + fade / 2) / fade) if i else 1.0
-        b = 1 - smooth((t - en + fade / 2) / fade)
-        v = a * b
-        if v > 0:
-            w[name] = w.get(name, 0) + v
-    return w
-
-
-def blend_palette(w):
-    tot = sum(w.values()) or 1
+        if secs[-1][0] != ln["section"]:
+            secs.append((ln["section"], ln["t0"] if len(secs) > 1 else INTRO))
+    secs.append(("outro", lines[-1]["t1"] + 0.8))
     out = []
-    for k in range(5):
-        out.append(tuple(int(sum(PALETTES[n][k][c] * v for n, v in w.items()) / tot) for c in range(3)))
+    for i, (name, st) in enumerate(secs):
+        en = secs[i + 1][1] if i + 1 < len(secs) else dur
+        out.append((name, st, en))
     return out
 
 
-def chorus_w(w):
-    return w.get("chorus", 0)
+def section_at(T, secs):
+    for k, (name, st, en) in enumerate(secs):
+        if T < en or k == len(secs) - 1:
+            return k, name, st, en
+    return len(secs) - 1, *secs[-1]
+
+
+def cam_pose(name, T, st, en, travel):
+    """Posicion/objetivo de la camara para una seccion. Devuelve (x, y, yaw, pitch, roll, fov, speed)."""
+    u = T - st
+    p = clamp(u / max(en - st, 1e-3))
+    if name == "intro":
+        k = smooth(T / INTRO)
+        return (0.0, lerp(175, 10, k ** 0.8), 0.0, lerp(-1.25, 0.04, smooth(T / (INTRO * 0.95))), 0.0, 1.15, 20)
+    if name == "verse":
+        return (3 * math.sin(u * 0.21), 7 + 2.5 * math.sin(u * 0.35), 0.12 * math.sin(u * 0.17),
+                0.07 + 0.05 * math.sin(u * 0.3), -0.05 * math.cos(u * 0.21), 1.2, 22)
+    if name == "prechorus":
+        return (2 * math.sin(u * 0.4), 8 + 34 * p ** 1.4, 0.1 * math.sin(u * 0.5),
+                0.08 + 0.32 * math.sin(math.pi * min(p * 1.15, 1)), 0.12 * math.sin(u * 0.9), 1.15, lerp(22, 50, p))
+    if name in ("chorus", "chorus 2"):
+        low_first = name == "chorus 2"
+        half = smooth((u - (en - st) * 0.5) / 2.0)
+        hi = 28 + 8 * math.sin(u * 0.45)
+        lo = 3.2 + 0.8 * math.sin(u * 0.9)
+        y = lerp(lo, hi, half) if low_first else lerp(hi, lo, half)
+        x = 6.5 * math.sin(u * 0.33)
+        pitch = lerp(-0.02, -0.12, half if low_first else 1 - half) + 0.04 * math.sin(u * 0.5)
+        spd = lerp(80, 60, half) if low_first else lerp(60, 80, half)
+        return (x, y, 0.16 * math.cos(u * 0.33), pitch, -0.33 * math.cos(u * 0.33), 1.0, spd)
+    if name == "verse 2":
+        return (2.2 * math.sin(u * 0.27), 3.2 + 0.6 * math.sin(u * 0.5), 0.2 * math.sin(u * 0.19),
+                0.03, 0.06 * math.sin(u * 0.3), 1.12, 16)
+    if name == "prechorus 2":
+        return (2.0 * math.sin(u * 0.5), 3.2 + 6 * p ** 2, 0.15 * math.sin(u * 0.4), 0.03 + 0.1 * p,
+                0.7 * p ** 2 * math.sin(u * 1.6), 1.1 - 0.15 * p, lerp(16, 45, p))
+    # outro
+    return (2 * math.sin(u * 0.2), lerp(40, 190, smooth(p * 1.1)), 0.1 * math.sin(u * 0.15),
+            lerp(-0.15, -0.75, smooth(p * 1.2)), 0.08 * math.sin(u * 0.25), 1.15, lerp(35, 6, p))
+
+
+def build_frames(secs, audio, nframes, lines):
+    """Precalcula camara + uniforms del mundo por fotograma."""
+    kicks = audio["kicks"]
+    # rayos: tiempos de descarga
+    bolts = [3.05, INTRO]
+    for name, st, en in secs:
+        ks = [k for k in kicks if st <= k < en]
+        if name == "verse":
+            bolts += ks[5::14]
+        elif name == "prechorus":
+            sel, last = [], -9
+            for k in ks:
+                if k - last > 0.42:
+                    sel.append(k)
+                    last = k
+            bolts += sel
+        elif name in ("chorus", "chorus 2"):
+            bolts += ks[::4]
+        elif name == "outro":
+            bolts += ks[2:30:9]
+    bolts = sorted(bolts)
+    frames = []
+    travel = 0.0
+    prev_name = None
+    for i in range(nframes):
+        T = i / FPS
+        k, name, st, en = section_at(T, secs)
+        pose = cam_pose(name, T, st, en, travel)
+        # mezcla suave de camara con la seccion anterior si siguen en el mismo mundo
+        if k > 0:
+            pname, pst, pen = secs[k - 1]
+            if (pname in HALL) == (name in HALL) and T - st < 1.0:
+                pp = cam_pose(pname, T, pst, pen, travel)
+                a = smooth((T - st) / 1.0)
+                pose = tuple(lerp(x, y, a) for x, y in zip(pp, pose))
+        x, y, yaw, pitch, roll, fov, spd = pose
+        j = min(i, len(audio["bass"]) - 1)
+        bass, kick = float(audio["bass"][j]), float(audio["kick"][j])
+        travel += spd * (0.85 + 0.35 * bass) / FPS
+        fwd = (math.sin(yaw) * math.cos(pitch), math.sin(pitch), math.cos(yaw) * math.cos(pitch))
+        pos = (x, y, travel)
+        tgt = (x + fwd[0], y + fwd[1], travel + fwd[2])
+        # paleta con fundido corto entre secciones
+        pal = PALETTES[name]
+        if k > 0 and T - st < 0.6:
+            pal = tuple(lerp3(a, b, smooth((T - st) / 0.6)) for a, b in zip(PALETTES[secs[k - 1][0]], pal))
+        # bombo mas reciente
+        ki = np.searchsorted(kicks, T, side="right") - 1
+        kt = kicks[ki] if ki >= 0 else -99
+        chorus = name in ("chorus", "chorus 2")
+        hall = name in HALL
+        # rayos
+        bi = np.searchsorted(bolts, T, side="right") - 1
+        flash = 0.0
+        if bi >= 0:
+            age = T - bolts[bi]
+            if age < 0.6:
+                flash = math.exp(-age * 10) + (0.7 * math.exp(-(age - 0.09) * 14) if age > 0.09 else 0)
+        flash *= 0 if hall else 1
+        cut = T - st
+        frames.append({
+            "T": T, "section": name, "k": k, "hall": hall,
+            "pos": pos, "tgt": tgt, "roll": roll, "fov": fov - (0.06 * kick if chorus else 0.0),
+            "bass": bass, "kick": kick, "pal": pal, "flash": flash,
+            "pulseR": (T - kt) * 95.0, "pulseA": math.exp(-(T - kt) * 2.0) * (1.0 if chorus else 0.0),
+            "kt": kt,
+            "win": smooth((T - 0.4) / 4.2) if name == "intro" else 1.0,
+            "strobe": (math.exp(-(T - kt) * 13) * (0.6 if name == "verse 2" else 1.0)) if hall else 0.0,
+            "laser": (0.55 + 0.9 * kick) if hall else 0.0,
+            "cars": 0.0 if hall else 1.0,
+            "rain": 0.0 if hall else (0.45 if chorus else 0.9),
+            "flash_scr": (0.6 * math.exp(-cut * 8) if k > 0 else 0.0) + (0.05 * kick if chorus else 0.0) + 0.12 * flash,
+            "glitch": clamp(1 - cut / 0.25) if k > 0 else 0.0,
+            "chroma": (1.2 * kick if chorus else 0.4 * kick),
+        })
+    # el centro de cada onda expansiva queda fijo donde estaba la camara al sonar el bombo
+    tz = {round(f["T"] * FPS): f["pos"][2] for f in frames}
+    for f in frames:
+        z0 = tz.get(round(f["kt"] * FPS), f["pos"][2])
+        f["pulseC"] = (0.0, 0.0, z0 + 70.0)
+    return frames, bolts
 
 
 # ----------------------------------------------------------------------------
-# camara y proyeccion
+# tipografia cinetica
 # ----------------------------------------------------------------------------
-class Cam:
-    def __init__(self, x, y, roll, pitch, yaw, f=560.0):
-        self.x, self.y, self.f = x, y, f
-        cr, sr_ = math.cos(roll), math.sin(roll)
-        cp, sp = math.cos(pitch), math.sin(pitch)
-        cy, sy = math.cos(yaw), math.sin(yaw)
-        ry = np.array([[cy, 0, -sy], [0, 1, 0], [sy, 0, cy]])
-        rx = np.array([[1, 0, 0], [0, cp, -sp], [0, sp, cp]])
-        rz = np.array([[cr, -sr_, 0], [sr_, cr, 0], [0, 0, 1]])
-        self.R = rz @ rx @ ry
-
-    def to_cam(self, P):
-        P = np.asarray(P, float).reshape(-1, 3) - np.array([self.x, self.y, 0.0])
-        return P @ self.R.T
-
-    def proj(self, C):
-        z = np.maximum(C[:, 2], 1e-3)
-        return np.stack([RW / 2 + self.f * C[:, 0] / z, RH * 0.5 - self.f * C[:, 1] / z], 1)
-
-    def segments(self, A, B, near=0.25):
-        """Proyecta segmentos 3D (Nx3, Nx3) recortando contra el plano cercano.
-        Devuelve (pts_a, pts_b, z_medio, ok)."""
-        CA, CB = self.to_cam(A), self.to_cam(B)
-        za, zb = CA[:, 2], CB[:, 2]
-        ok = (za > near) | (zb > near)
-        t = np.where(za < near, (near - za) / (zb - za + 1e-9), 0)[:, None]
-        CA = np.where((za < near)[:, None], CA + (CB - CA) * t, CA)
-        t = np.where(zb < near, (near - zb) / (za - zb + 1e-9), 0)[:, None]
-        CB = np.where((zb < near)[:, None], CB + (CA - CB) * t, CB)
-        return self.proj(CA), self.proj(CB), (CA[:, 2] + CB[:, 2]) / 2, ok
+FONT_FILES = {
+    "anton": "Anton-Regular.ttf",
+    "bungee": "Bungee-Regular.ttf",
+    "monoton": "Monoton-Regular.ttf",
+    "orbitron": "Orbitron[wght].ttf",
+}
 
 
-def draw_segs(dr, cam, A, B, color, width=2, zfade=60.0, minw=1):
-    pa, pb, zm, ok = cam.segments(A, B)
-    for i in np.nonzero(ok)[0]:
-        k = clamp(1.0 - zm[i] / zfade, 0.0, 1.0) ** 1.3
-        if k < 0.02:
-            continue
-        w = max(minw, int(round(width * clamp(6.0 / max(zm[i], 0.5), 0.4, 1.6))))
-        dr.line([tuple(pa[i]), tuple(pb[i])], fill=scale_col(color, k), width=w)
+@lru_cache(maxsize=64)
+def font(key, size):
+    f = ImageFont.truetype(os.path.join(FONTS, FONT_FILES[key]), size)
+    if key == "orbitron":
+        try:
+            f.set_variation_by_name("Black")
+        except Exception:
+            pass
+    return f
 
 
-# ----------------------------------------------------------------------------
-# elementos del mundo
-# ----------------------------------------------------------------------------
-@lru_cache(maxsize=None)
-def vignette():
-    yy, xx = np.mgrid[0:H, 0:W]
-    d = np.sqrt(((xx - W / 2) / (W / 2)) ** 2 + ((yy - H / 2) / (H / 2)) ** 2)
-    return np.clip(1.15 - 0.45 * d ** 2, 0.35, 1.0).astype(np.float32)[..., None]
+@lru_cache(maxsize=256)
+def cap(key, size):
+    return -font(key, size).getbbox("H", anchor="ls")[1]
 
 
-def sky(pal, horizon):
-    top, bot = np.array(pal[3], float), np.array(pal[4], float)
-    y = np.arange(RH, dtype=float)[:, None]
-    t = np.clip(y / max(horizon, 1), 0, 1) ** 1.6
-    col = top * (1 - t) + bot * t
-    below = y >= horizon
-    col = np.where(below, np.array([4, 0, 10], float), col)
-    return np.repeat(col[:, None, :], RW, 1).reshape(RH, RW, 3)
+def to255(c, k=1.0):
+    return tuple(int(clamp(v * k, 0, 1) * 255) for v in c)
 
 
-@lru_cache(maxsize=8)
-def sun_sprite(r, c1, c2):
-    s = 2 * r + 4
-    im = Image.new("RGBA", (s, s), (0, 0, 0, 0))
-    arr = np.zeros((s, s, 4), np.float32)
-    yy, xx = np.mgrid[0:s, 0:s]
-    d = np.sqrt((xx - s / 2) ** 2 + (yy - s / 2) ** 2)
-    inside = d < r
-    t = (yy / s)[..., None]
-    col = np.array(c1) * (1 - t) + np.array(c2) * t
-    # franjas horizontales en la mitad inferior (sol synthwave)
-    yn = (yy - s / 2) / r
-    gap = (yn > 0.05) & (np.mod(yn * 10 + yn ** 2 * 8, 1.6) < 0.35 + yn * 0.5)
-    a = inside & ~gap
-    arr[..., :3] = col
-    arr[..., 3] = a * 255
-    im = Image.fromarray(arr.astype(np.uint8), "RGBA")
-    return im
-
-
-def make_city(seed=3):
-    rng = np.random.default_rng(seed)
-    boxes = []
-    for side in (-1, 1):
-        z = 0.0
-        while z < 140:
-            w = rng.uniform(2.0, 5.0)
-            d = rng.uniform(2.0, 5.0)
-            h = rng.uniform(3, 20) * (1.4 if rng.random() < 0.15 else 1)
-            x = side * rng.uniform(7, 16)
-            boxes.append((x, z, w, d, h))
-            z += d + rng.uniform(1.0, 4.0)
-    return boxes
-
-
-CITY = make_city()
-CITY_LEN = 140.0
-
-
-def box_edges(x, y0, z, w, d, h):
-    xs, zs = (x - w / 2, x + w / 2), (z, z + d)
-    v = [(xs[i], y0 + h * k, zs[j]) for k in (0, 1) for j in (0, 1) for i in (0, 1)]
-    e = [(0, 1), (2, 3), (0, 2), (1, 3), (4, 5), (6, 7), (4, 6), (5, 7), (0, 4), (1, 5), (2, 6), (3, 7)]
-    return np.array(v), e
-
-
-def hull(pts):
-    pts = sorted(set(map(tuple, np.round(pts, 1))))
-    if len(pts) < 3:
-        return pts
-
-    def cross(o, a, b):
-        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
-    lo, up = [], []
-    for p in pts:
-        while len(lo) >= 2 and cross(lo[-2], lo[-1], p) <= 0:
-            lo.pop()
-        lo.append(p)
-    for p in reversed(pts):
-        while len(up) >= 2 and cross(up[-2], up[-1], p) <= 0:
-            up.pop()
-        up.append(p)
-    return lo[:-1] + up[:-1]
-
-
-def draw_city(dr, cam, travel, floor_y, pal, amount, bass):
-    if amount <= 0.02:
-        return
-    items = []
-    for (x, z0, w, d, h) in CITY:
-        z = (z0 - travel) % CITY_LEN - 4
-        items.append((z, x, w, d, h * (1 + 0.25 * bass * (abs(x) < 12))))
-    items.sort(key=lambda b: -b[0])
-    for z, x, w, d, h in items:
-        V, E = box_edges(x, floor_y, z, w, d, h)
-        C = cam.to_cam(V)
-        if (C[:, 2] < 0.5).any():
-            continue
-        P = cam.proj(C)
-        zf = clamp(1 - z / 120, 0, 1) * amount
-        if zf < 0.03:
-            continue
-        hp = hull(P)
-        if len(hp) >= 3:
-            dr.polygon(hp, fill=scale_col((10, 0, 24), 1.0))
-        edge = mixc(pal[1], pal[0], (math.sin(x * 3.1 + z0) + 1) / 2)
-        for a, b in E:
-            dr.line([tuple(P[a]), tuple(P[b])], fill=scale_col(edge, zf), width=1)
-        # ventanas: puntos de luz en la cara que mira a la carretera
-        fx = x - np.sign(x) * w / 2
-        rng = np.random.default_rng(int(z0 * 10))
-        nwin = int(h * 1.2)
-        wy = floor_y + rng.uniform(0.5, h - 0.3, nwin)
-        wz = z + rng.uniform(0.2, d - 0.2, nwin)
-        Wp = cam.proj(cam.to_cam(np.stack([np.full(nwin, fx), wy, wz], 1)))
-        wc = scale_col(pal[0] if rng.random() < 0.5 else (255, 220, 140), zf * 0.9)
-        for p in Wp:
-            dr.rectangle([p[0], p[1], p[0] + 1, p[1] + 1], fill=wc)
-
-
-def draw_grid(dr, cam, travel, floor_y, pal, amount, kick):
-    if amount <= 0.02:
-        return
-    zmax, step = 70.0, 2.0
-    col = scale_col(pal[1], amount * (0.8 + 0.5 * kick))
-    xs = np.arange(-30, 31) * step
-    A = np.stack([xs, np.full_like(xs, floor_y), np.full_like(xs, 0.3)], 1)
-    B = np.stack([xs, np.full_like(xs, floor_y), np.full_like(xs, zmax)], 1)
-    draw_segs(dr, cam, A, B, col, width=2, zfade=zmax)
-    zs = np.arange(0, 36) * step + (-travel % step)
-    A = np.stack([np.full_like(zs, -60), np.full_like(zs, floor_y), zs], 1)
-    B = np.stack([np.full_like(zs, 60), np.full_like(zs, floor_y), zs], 1)
-    draw_segs(dr, cam, A, B, col, width=2, zfade=zmax)
-
-
-def draw_tunnel(dr, cam, travel, t, pal, amount, kick, bass):
-    if amount <= 0.02:
-        return
-    spacing, n = 3.0, 22
-    off = travel % spacing
-    sides = 6
-    for k in range(n, 0, -1):
-        z = k * spacing - off
-        if z < 0.6:
-            continue
-        r = 4.2 * (1 + 0.18 * kick * math.exp(-z / 25))
-        rot = z * 0.07 + t * 0.4
-        ang = rot + np.arange(sides + 1) * 2 * math.pi / sides
-        P = np.stack([r * np.cos(ang), r * np.sin(ang) + 0.6, np.full(sides + 1, z + travel * 0)], 1)
-        P[:, 0] += cam.x
-        P[:, 1] += cam.y - 0.3
-        hue = (t * 0.05 + k * 0.035) % 1.0
-        c = mixc(hsv(hue, 0.85, 1.0), pal[0], 0.35)
-        fade = clamp(1 - z / (n * spacing), 0, 1) ** 1.2 * amount
-        draw_segs(dr, cam, P[:-1], P[1:], scale_col(c, fade * 1.3), width=3, zfade=200)
-
-
-ICO_V = None
-ICO_E = None
-
-
-def icosa():
-    global ICO_V, ICO_E
-    if ICO_V is None:
-        p = (1 + 5 ** 0.5) / 2
-        v = []
-        for a in (-1, 1):
-            for b in (-p, p):
-                v += [(0, a, b), (a, b, 0), (b, 0, a)]
-        V = np.array(v, float)
-        V /= np.linalg.norm(V[0])
-        E = [(i, j) for i in range(12) for j in range(i + 1, 12)
-             if abs(np.linalg.norm(V[i] - V[j]) - 1.0515) < 0.05]
-        ICO_V, ICO_E = V, E
-    return ICO_V, ICO_E
-
-
-def rot_mat(ax, ay, az):
-    cx, sx, cy, sy, cz, sz = math.cos(ax), math.sin(ax), math.cos(ay), math.sin(ay), math.cos(az), math.sin(az)
-    return (np.array([[1, 0, 0], [0, cx, -sx], [0, sx, cx]]) @
-            np.array([[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]]) @
-            np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]]))
-
-
-def draw_poly(dr, cam, t, pal, amount, bass, center, size):
-    if amount <= 0.02:
-        return
-    V, E = icosa()
-    R = rot_mat(t * 0.5, t * 0.73, t * 0.21)
-    for shell, sc in ((0, 1.0), (1, 0.55)):
-        Vr = (V @ R.T if shell == 0 else V @ R) * size * sc * (1 + 0.25 * bass) + np.array(center)
-        A = np.array([Vr[a] for a, b in E])
-        B = np.array([Vr[b] for a, b in E])
-        c = pal[0] if shell == 0 else pal[1]
-        draw_segs(dr, cam, A, B, scale_col(c, amount), width=3, zfade=80)
-
-
-def draw_stars(dr, cam, travel, t, amount, speed):
-    if amount <= 0.02:
-        return
-    rng = np.random.default_rng(11)
-    n = 260
-    X = rng.uniform(-40, 40, n) + cam.x
-    Y = rng.uniform(-8, 30, n)
-    Z0 = rng.uniform(0, 90, n)
-    Z = (Z0 - travel * 1.5) % 90 + 1
-    A = np.stack([X, Y, Z], 1)
-    B = np.stack([X, Y, Z + 0.15 + speed * 0.06], 1)
-    pa, pb, zm, ok = cam.segments(A, B)
-    for i in np.nonzero(ok)[0]:
-        k = clamp(1 - zm[i] / 90, 0, 1) * amount
-        dr.line([tuple(pa[i]), tuple(pb[i])], fill=scale_col((220, 230, 255), k), width=2 if zm[i] < 15 else 1)
-
-
-def draw_lightning(dr, seed, age, pal):
-    if age > 0.22:
-        return
-    rng = np.random.default_rng(seed)
-    x = rng.uniform(RW * 0.15, RW * 0.85)
-    y = 0.0
-    pts = [(x, y)]
-    while y < RH * 0.55:
-        y += rng.uniform(12, 30)
-        x += rng.uniform(-28, 28)
-        pts.append((x, y))
-    k = 1 - age / 0.22
-    dr.line(pts, fill=scale_col((255, 255, 255), k), width=4)
-    dr.line(pts, fill=scale_col(pal[0], k), width=2)
-    for j in range(2, len(pts) - 2, 3):
-        bx, by = pts[j]
-        br = [(bx, by)]
-        for _ in range(4):
-            bx += rng.uniform(-26, 26)
-            by += rng.uniform(8, 20)
-            br.append((bx, by))
-        dr.line(br, fill=scale_col(pal[0], k * 0.8), width=2)
-
-
-def draw_spectrum(dr, spec, pal, amount):
-    """Ecualizador espejado en la parte baja del encuadre."""
-    if amount <= 0.02:
-        return
-    n = len(spec)
-    bw = RW / (2 * n + 6)
-    base = RH - 14
-    for i in range(n):
-        v = float(spec[i])
-        h = 3 + v * 48
-        c = mixc(pal[0], pal[1], i / n)
-        c = scale_col(c, amount * 0.85)
-        for sgn in (-1, 1):
-            cx = RW / 2 + sgn * (i + 0.5) * bw * 1.05
-            dr.rectangle([cx - bw * 0.38, base - h, cx + bw * 0.38, base], fill=c)
-
-
-# ----------------------------------------------------------------------------
-# texto 3D extruido
-# ----------------------------------------------------------------------------
-@lru_cache(maxsize=16)
-def font(size, ui=False):
-    return ImageFont.truetype(FONT_UI if ui else FONT, size)
+def text_colors(pal, accent):
+    c1, c2 = pal[0], pal[1]
+    if accent:
+        face_a = to255(tuple(0.55 * v + 0.45 for v in c1))
+        face_b = to255(c1)
+        side = to255(c2, 0.55)
+    else:
+        face_a = (255, 255, 255)
+        face_b = to255(tuple(0.75 + 0.25 * v for v in c1))
+        side = to255(c2, 0.45)
+    return face_a, face_b, side
 
 
 def _shift(m, dx, dy):
     out = np.zeros_like(m)
     h, w = m.shape
-    if dx >= 0 and dy >= 0:
-        out[dy:, dx:] = m[:h - dy, :w - dx]
+    out[dy:, dx:] = m[:h - dy, :w - dx]
     return out
 
 
-@lru_cache(maxsize=512)
-def word_sprite(word, size, face_a, face_b, side, glow, accent):
-    """Palabra con extrusion 3D, contorno, degradado frontal, brillo y halo neon (RGBA)."""
-    f = font(size)
-    l, t, r, b = f.getbbox(word, anchor="ls")
-    depth = int(size * 0.13)
-    stroke = max(3, size // 26)
-    gr = int(size * 0.16)
-    pad = stroke + gr + 4
-    w = r - l + 2 * pad + depth
-    h = b - t + 2 * pad + depth
-    ox, oy = pad - l, pad - t
+@lru_cache(maxsize=6000)
+def glyph(ch, fkey, size, colors):
+    """Letra 3D: extrusion, contorno, cara con degradado y bisel. Centrada en la imagen."""
+    face_a, face_b, side = colors
+    f = font(fkey, size)
+    adv = f.getlength(ch)
+    l, t, r, b = f.getbbox(ch, anchor="ls")
+    cap = -f.getbbox("H", anchor="ls")[1]
+    depth = max(3, int(size * 0.09))
+    stroke = max(2, size // 30)
+    cx0, cy0 = adv / 2, -cap / 2
+    hw = max(cx0 - l, r - cx0) + stroke + depth + 6
+    hh = max(cy0 - t, b - cy0) + stroke + depth + 6
+    w, h = int(2 * hw) + 2, int(2 * hh) + 2
+    ox, oy = w / 2 - cx0, h / 2 - cy0
 
     def mask(sw):
         im = Image.new("L", (w, h), 0)
-        ImageDraw.Draw(im).text((ox, oy), word, font=f, anchor="ls", fill=255, stroke_width=sw, stroke_fill=255)
+        ImageDraw.Draw(im).text((ox, oy), ch, font=f, anchor="ls", fill=255, stroke_width=sw, stroke_fill=255)
         return np.asarray(im, np.float32) / 255.0
 
-    m_face = mask(0)
-    m_out = mask(stroke)
+    m_face, m_out = mask(0), mask(stroke)
     rgb = np.zeros((h, w, 3), np.float32)
     al = np.zeros((h, w), np.float32)
-
-    def over(c, a):
-        nonlocal rgb, al
-        a = a[..., None]
-        rgb = rgb * (1 - a) + np.array(c, np.float32) * a
-        al = np.maximum(al, a[..., 0])
-
-    # halo neon (debajo de todo)
-    g = Image.fromarray((m_out * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(gr * 0.55))
-    ga = np.asarray(g, np.float32) / 255.0
-    halo_a = np.clip(ga * 1.25, 0, 0.9)
-    rgb = np.array(glow, np.float32) * np.ones((h, w, 1), np.float32)
-    al = halo_a.copy()
-    # extrusion: capas desde el fondo hacia la cara frontal
     sideA = np.array(side, np.float32)
-    sideB = np.array(glow, np.float32) * 0.55 + sideA * 0.45
+    sideB = sideA * 0.25
     for k in range(depth, 0, -1):
-        dx, dy = int(round(k * 0.45)), int(round(k * 0.9))
         u = k / depth
-        c = sideB * (1 - u) + sideA * u
-        lit = 0.55 + 0.45 * (1 - u)
-        over(tuple(c * lit), _shift(m_out, dx, dy))
-    # contorno oscuro + cara con degradado vertical
-    over((8, 0, 20), m_out)
-    yy = np.linspace(0, 1, h)[:, None, None]
-    ys = (yy - (oy - size * 0.75) / h) / (size * 0.85 / h)
-    ys = np.clip(ys, 0, 1)
-    fa, fb = np.array(face_a, np.float32), np.array(face_b, np.float32)
-    face = fa * (1 - ys) + fb * ys
-    if accent:
-        # franja brillante diagonal tipo cromo
-        xx = np.linspace(0, 1, w)[None, :, None]
-        band = np.exp(-((ys - 0.48 + (xx - 0.5) * 0.25) ** 2) / 0.004)
-        face = face * (1 - 0.6 * band) + 255 * 0.6 * band
+        a = _shift(m_out, int(round(k * 0.35)), int(round(k * 0.9)))[..., None]
+        rgb = rgb * (1 - a) + (sideB * u + sideA * (1 - u)) * a
+        al = np.maximum(al, a[..., 0])
+    a = m_out[..., None]
+    rgb = rgb * (1 - a) + np.array((10, 0, 24), np.float32) * a
+    al = np.maximum(al, m_out)
+    yy = np.linspace(0, h, h)[:, None, None]
+    g = np.clip((yy - (oy - cap)) / max(cap, 1), 0, 1)
+    face = np.array(face_a, np.float32) * (1 - g) + np.array(face_b, np.float32) * g
     a = m_face[..., None]
     rgb = rgb * (1 - a) + face * a
-    al = np.maximum(al, m_face)
-    # brillo superior (bisel)
-    rim = np.clip(m_face - _shift(m_face, 0, max(2, size // 40)), 0, 1)[..., None] * 0.8
+    rim = np.clip(m_face - _shift(m_face, 0, max(2, size // 45)), 0, 1)[..., None] * 0.85
     rgb = rgb * (1 - rim) + 255 * rim
-    out = np.dstack([np.clip(rgb, 0, 255), al * 255]).astype(np.uint8)
-    return Image.fromarray(out, "RGBA"), ox, oy
+    return Image.fromarray(np.dstack([np.clip(rgb, 0, 255), al * 255]).astype(np.uint8), "RGBA")
 
 
-def layout(text, chorus):
+SCRAMBLE = "#$%&@!?<>/\\01ABCDEFXYZ"
+
+# fuente, tamano, estilo de entrada, salida, efecto por seccion
+SECTION_STYLE = {
+    "verse":       ("anton", 190, ["glitch", "pop", "drop", "spin"], "zoom"),
+    "prechorus":   ("orbitron", 130, ["slam"], "scatter"),
+    "chorus":      ("bungee", 190, ["slam"], "zoom"),
+    "verse 2":     ("orbitron", 120, ["glitch", "spin"], "glitchout"),
+    "prechorus 2": ("orbitron", 130, ["slam"], "scatter"),
+    "chorus 2":    ("bungee", 190, ["slam"], "zoom"),
+}
+CHORUS_FX = {
+    "electric pulse": ("slam", "zoom", "pulse"),
+    "feel it shake": ("pop", "fall", "shake"),
+    "feel it jolt": ("glitch", "glitchout", "jolt"),
+    "it's in our veins": ("drop", "zoom", "flow"),
+    "we can't revolt": ("slam", "scatter", "pulse"),
+}
+
+
+def make_items(lines):
+    items = []
+    count = {}
+    for idx, ln in enumerate(lines):
+        sec = ln["section"]
+        fkey, size, styles, exit_ = SECTION_STYLE[sec]
+        n = count.get(sec, 0)
+        count[sec] = n + 1
+        sin, fx = styles[n % len(styles)], "none"
+        if sec.startswith("chorus"):
+            sin, exit_, fx = CHORUS_FX.get(ln["text"].lower(), ("slam", "zoom", "pulse"))
+        if sec.startswith("prechorus"):
+            fx = "pulse"
+        t1 = lines[idx + 1]["t0"] if idx + 1 < len(lines) and lines[idx + 1]["t0"] - ln["t1"] < 1.0 else ln["t1"]
+        items.append({
+            "t0": ln["t0"], "t1": t1, "text": ln["text"].upper(), "font": fkey, "size": size,
+            "in": sin, "out": exit_, "fx": fx, "cy": H * 0.48, "tracking": 0.0,
+            "chorus": sec.startswith("chorus"), "section": sec, "seed": idx * 7 + 3,
+            "wordtime": True,
+        })
+    return items
+
+
+def intro_outro_items(outro_start, dur):
+    return [
+        {"t0": 0.7, "t1": 5.55, "text": ARTIST, "font": "monoton", "size": 210, "in": "glitch", "out": "glitchout",
+         "fx": "none", "cy": H * 0.40, "tracking": 0.12, "chorus": False, "section": "intro", "seed": 1,
+         "wordtime": False, "accent_all": True, "stagger": 0.09},
+        {"t0": 2.95, "t1": 5.55, "text": TITLE, "font": "orbitron", "size": 112, "in": "slam", "out": "zoom",
+         "fx": "pulse", "cy": H * 0.66, "tracking": 0.04, "chorus": False, "section": "intro", "seed": 2,
+         "wordtime": False, "stagger": 0.05},
+        {"t0": outro_start + 0.6, "t1": dur + 5, "text": TITLE, "font": "orbitron", "size": 118, "in": "slam",
+         "out": "zoom", "fx": "pulse", "cy": H * 0.43, "tracking": 0.04, "chorus": False, "section": "outro",
+         "seed": 5, "wordtime": False, "stagger": 0.05},
+        {"t0": outro_start + 2.0, "t1": dur + 5, "text": ARTIST, "font": "monoton", "size": 150, "in": "glitch",
+         "out": "glitchout", "fx": "none", "cy": H * 0.66, "tracking": 0.12, "chorus": False, "section": "outro",
+         "seed": 6, "wordtime": False, "accent_all": True, "stagger": 0.08},
+    ]
+
+
+@lru_cache(maxsize=256)
+def layout(text, fkey, base, tracking, maxw=1640):
+    """Reparte en 1-2 filas y devuelve [(char, x, y, size, word_idx, accent)] centrado en (0,0)."""
     words = text.split()
-    size = 230 if chorus else 200
-    maxw = 1500
+    size = base
     while True:
-        f = font(size)
-        sp = f.getlength(" ") * 1.1
-        rows, cur, cw = [], [], 0
-        for wd in words:
-            wl = f.getlength(wd)
+        sizes = [int(size * (1.22 if re.sub(r"[^a-z\-]", "", w.lower()) in KEYWORDS else 1.0)) for w in words]
+
+        def wlen(w, s):
+            f = font(fkey, s)
+            return f.getlength(w) + tracking * s * (len(w) - 1)
+        rows, cur, cw = [], [], 0.0
+        for wi, wd in enumerate(words):
+            wl = wlen(wd, sizes[wi])
+            sp = font(fkey, sizes[wi]).getlength(" ") * 0.9
             if cur and cw + sp + wl > maxw:
                 rows.append(cur)
-                cur, cw = [], 0
+                cur, cw = [], 0.0
             cw += (sp if cur else 0) + wl
-            cur.append(wd)
+            cur.append(wi)
         rows.append(cur)
-        widest = max(sum(f.getlength(x) for x in r) + sp * (len(r) - 1) for r in rows)
-        if (len(rows) <= 2 and widest <= maxw) or size <= 90:
+        widths = [sum(wlen(words[i], sizes[i]) for i in r) + sum(font(fkey, sizes[i]).getlength(" ") * 0.9 for i in r[1:]) for r in rows]
+        if (len(rows) <= 2 and max(widths) <= maxw) or size < 70:
             break
-        size -= 10
-    lh = size * 1.12
-    placed = []
-    for ri, r in enumerate(rows):
-        rw = sum(f.getlength(x) for x in r) + sp * (len(r) - 1)
+        size -= 8
+    out = []
+    row_h = [max(sizes[i] for i in r) for r in rows]
+    total = sum(h * 1.05 for h in row_h)
+    y = -total / 2
+    for r, rw, rh in zip(rows, widths, row_h):
+        y += rh * 1.05
         x = -rw / 2
-        y = (ri - (len(rows) - 1) / 2) * lh + size * 0.35  # linea base
-        for wd in r:
-            placed.append((wd, x, y))
-            x += f.getlength(wd) + sp
-    return size, placed, len(rows) * lh
+        for wi in r:
+            s = sizes[wi]
+            f = font(fkey, s)
+            wd = words[wi]
+            accent = s != size
+            for ci, ch in enumerate(wd):
+                out.append((ch, x + f.getlength(wd[:ci]) + tracking * s * ci, y - cap(fkey, s) / 2, s, wi, accent))
+            x += f.getlength(wd) + tracking * s * (len(wd) - 1) + f.getlength(" ") * 0.9
+    return tuple(out), size
 
 
 def homography(src, dst):
-    """Coeficientes PIL PERSPECTIVE que mapean puntos de dst (salida) a src (entrada)."""
-    A, bvec = [], []
+    A, bv = [], []
     for (x, y), (u, v) in zip(dst, src):
         A.append([x, y, 1, 0, 0, 0, -u * x, -u * y])
         A.append([0, 0, 0, x, y, 1, -v * x, -v * y])
-        bvec += [u, v]
-    return np.linalg.solve(np.array(A, float), np.array(bvec, float)).tolist()
+        bv += [u, v]
+    return np.linalg.solve(np.array(A, float), np.array(bv, float)).tolist()
 
 
-def place_3d(cw, ch, cx, cy, z, yaw, pitch, roll, f=1700.0):
-    pts = []
+def rot_mat(ax, ay, az):
+    cx, sx, cy, sy, cz, sz = math.cos(ax), math.sin(ax), math.cos(ay), math.sin(ay), math.cos(az), math.sin(az)
+    return (np.array([[1, 0, 0], [0, cx, -sx], [0, sx, cx]]) @ np.array([[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]]) @
+            np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]]))
+
+
+def place(layer, canvas, cx, cy, z, yaw, pitch, roll, alpha, f=1800.0):
+    cw, ch = canvas.size
     R = rot_mat(pitch, yaw, roll)
+    dst = []
     for (x, y) in ((0, 0), (cw, 0), (cw, ch), (0, ch)):
         P = R @ np.array([x - cw / 2, y - ch / 2, 0.0])
-        zz = max(P[2] + z + f, 50)
-        pts.append((cx + f * P[0] / zz, cy + f * P[1] / zz))
-    return pts
-
-
-def render_line(frame, ln, t, pal, kick, chorus, shake):
-    t0, t1 = ln["t0"], ln["t1"]
-    if t < t0 - 0.35 or t > t1 + 0.35:
-        return
-    size, placed, block_h = layout(ln["text"], chorus > 0.5)
-    words = [p[0] for p in placed]
-    # tiempos por palabra: se reparten en el primer 55% de la frase segun su longitud
-    dur = max(0.4, t1 - t0)
-    span = min(dur * 0.55, 0.42 * len(words))
-    lens = np.array([len(w) + 2 for w in words], float)
-    starts = t0 - 0.12 + np.concatenate([[0], np.cumsum(lens)[:-1]]) / lens.sum() * span
-    # lienzo de la frase
-    margin = int(size * 0.6)
-    xs = [p[1] for p in placed]
-    cw = int(max(abs(min(xs)), abs(max(xs) + font(size).getlength(placed[-1][0]))) * 2 + 2 * margin + size * 0.5)
-    ch = int(block_h + 2 * margin + size * 0.5)
-    canvas = Image.new("RGBA", (cw, ch), (0, 0, 0, 0))
-    face_a, face_b = (255, 255, 255), mixc(pal[0], (255, 255, 255), 0.15)
-    acc_a, acc_b = mixc(pal[1], (255, 255, 255), 0.55), pal[1]
-    for (wd, x, y), st in zip(placed, starts):
-        age = t - st
-        if age < 0:
-            continue
-        accent = re.sub(r"[^a-z\-]", "", wd.lower()) in KEYWORDS
-        spr, ox, oy = word_sprite(
-            wd, size, face_a if not accent else acc_a, face_b if not accent else acc_b,
-            pal[2], pal[1] if not accent else pal[0], accent)
-        p = clamp(age / 0.32)
-        sc = 1.9 - 0.9 * back_out(p) if p < 1 else 1.0
-        if accent:
-            sc *= 1 + 0.06 * kick
-        a = ease_out(age / 0.18)
-        sw, sh = max(1, int(spr.width * sc)), max(1, int(spr.height * sc))
-        s2 = spr.resize((sw, sh), Image.BILINEAR) if sc != 1.0 else spr
-        if a < 1:
-            s2 = s2.copy()
-            s2.putalpha(s2.getchannel("A").point(lambda v, a=a: int(v * a)))
-        px = cw / 2 + x - ox * sc - (sc - 1) * (spr.width - 2 * ox) * 0.5 * 0.3
-        py = ch / 2 + y - oy * sc + (1 - sc) * size * 0.3
-        canvas.alpha_composite(s2, (int(px), int(py)))
-    # entrada desde el fondo y salida hacia la camara
-    enter = ease_out((t - (t0 - 0.35)) / 0.45)
-    leave = ease_in((t - (t1 - 0.22)) / 0.5)
-    z = (1 - enter) * 1400 - leave * 1300 - 90 * kick * chorus
-    alpha = clamp(enter * 1.5) * (1 - clamp(leave * 1.4))
-    if alpha <= 0.01:
-        return
-    if alpha < 1:
+        zz = max(P[2] + z + f, 60)
+        dst.append((cx + f * P[0] / zz, cy + f * P[1] / zz))
+    if alpha < 0.999:
+        canvas = canvas.copy()
         canvas.putalpha(canvas.getchannel("A").point(lambda v: int(v * alpha)))
-    seed = (sum(map(ord, ln["text"])) * 37 % 1000) / 1000 * 6.28
-    yaw = 0.30 * math.sin(t * 0.55 + seed) + (1 - enter) * 0.6 * (1 if seed > 3 else -1)
-    pitch = 0.14 * math.sin(t * 0.43 + seed * 0.7) - 0.04 + (1 - enter) * 0.4
-    roll = 0.04 * math.sin(t * 0.31 + seed) + leave * 0.25
-    cx = W / 2 + shake[0]
-    cy = H * 0.47 + shake[1]
-    dst = place_3d(cw, ch, cx, cy, z, yaw, pitch, roll)
     coeffs = homography([(0, 0), (cw, 0), (cw, ch), (0, ch)], dst)
-    layer = canvas.transform((W, H), Image.PERSPECTIVE, coeffs, Image.BILINEAR)
-    frame.alpha_composite(layer)
+    layer.alpha_composite(canvas.transform((W, H), Image.PERSPECTIVE, coeffs, Image.BILINEAR))
 
 
-def render_title(frame, t, start, end, pal, kick):
-    """Titulo final: ELECTRIC / PULSE girando en 3D."""
-    if t < start:
-        return
-    k = ease_out((t - start) / 1.4)
-    out = 1 - smooth((t - (end - 2.5)) / 2.0)
-    canvas = Image.new("RGBA", (1900, 760), (0, 0, 0, 0))
-    for i, (wd, size) in enumerate((("ELECTRIC", 250), ("PULSE", 330))):
-        spr, ox, oy = word_sprite(wd, size, mixc(pal[1], (255, 255, 255), 0.6), pal[1], pal[2], pal[0], True)
-        canvas.alpha_composite(spr, (int(950 - (spr.width - 2 * ox + size * 0.13) / 2 - ox + ox * 0),
-                                     int(40 + i * 300 - (oy - size)) ))
-    a = k * out
-    if a <= 0.01:
-        return
-    canvas.putalpha(canvas.getchannel("A").point(lambda v: int(v * a)))
-    yaw = 0.45 * math.sin((t - start) * 0.5) * (1 - k * 0.3)
-    pitch = 0.18 * math.sin((t - start) * 0.37) + (1 - k) * 0.9
-    z = (1 - k) * 2500 - 120 * kick
-    dst = place_3d(1900, 760, W / 2, H * 0.46, z, yaw, pitch, 0.03 * math.sin(t))
-    coeffs = homography([(0, 0), (1900, 0), (1900, 760), (0, 760)], dst)
-    frame.alpha_composite(canvas.transform((W, H), Image.PERSPECTIVE, coeffs, Image.BILINEAR))
+def glyph_in(style, a, rnd, T):
+    """(dx, dy, scale, rot, alpha, scramble)"""
+    if a < 0:
+        return None
+    if style == "pop":
+        p = clamp(a / 0.38)
+        return (0, (1 - ease_out(p)) * 70, max(0.01, back_out(p)), (1 - ease_out(p)) * rnd[0] * 35, clamp(a / 0.1), False)
+    if style == "slam":
+        p = clamp(a / 0.15)
+        sc = lerp(3.4, 1.0, ease_in(p) ** 0.7)
+        if p >= 1:
+            sc = 1 + 0.14 * math.exp(-(a - 0.15) * 12) * math.cos((a - 0.15) * 34)
+        return (0, 0, sc, (1 - p) * rnd[1] * 12, clamp(a / 0.07), False)
+    if style == "glitch":
+        if a < 0.26:
+            fl = 0.35 + 0.65 * ((int(T * 30) + int(rnd[2] * 7)) % 2)
+            return (rnd[0] * 30 * (1 - a / 0.26) * math.sin(T * 90), 0, 1.0, 0, fl * clamp(a / 0.05), True)
+        return (0, 0, 1.0, 0, 1.0, False)
+    if style == "drop":
+        p = clamp(a / 0.55)
+        return (0, -(1 - bounce_out(p)) * 420, 1.0, (1 - p) * rnd[1] * 25, clamp(a / 0.08), False)
+    if style == "spin":
+        p = clamp(a / 0.45)
+        return (0, 0, max(0.01, ease_out(p)), (1 - ease_out(p)) * 300 * (1 if rnd[2] > 0.5 else -1), clamp(a / 0.15), False)
+    return (0, 0, 1.0, 0, 1.0, False)
+
+
+def render_item(layer, it, T, kick, pal):
+    t0, t1 = it["t0"], it["t1"]
+    if T < t0 - 0.35 or T > t1 + 0.6:
+        return 0.0
+    glyphs, base = layout(it["text"], it["font"], it["size"], it["tracking"])
+    nwords = max(g[4] for g in glyphs) + 1
+    # tiempos de entrada por palabra (proporcionales a su longitud dentro del 55% inicial)
+    words = it["text"].split()
+    if it["wordtime"]:
+        span = min((t1 - t0) * 0.55, 0.45 * nwords)
+        lens = np.array([len(w) + 2 for w in words], float)
+        wstart = t0 - 0.08 + np.concatenate([[0], np.cumsum(lens)[:-1]]) / lens.sum() * span
+        stag = 0.028
+    else:
+        wstart = [t0] * nwords
+        stag = it.get("stagger", 0.05)
+    exit_t = t1 - 0.28
+    e = clamp((T - exit_t) / 0.45)
+    xs = [g[1] for g in glyphs]
+    ys = [g[2] for g in glyphs]
+    margin = int(base * 2.2)
+    cw = int(max(abs(min(xs)), abs(max(xs))) * 2 + 2 * margin)
+    ch = int(max(abs(min(ys)), abs(max(ys))) * 2 + 2 * margin)
+    canvas = Image.new("RGBA", (cw, ch), (0, 0, 0, 0))
+    glitch = 0.0
+    wi_count = {}
+    for gi, (c, x, y, s, wi, accent) in enumerate(glyphs):
+        k = wi_count.get(wi, 0)
+        wi_count[wi] = k + 1
+        rng = random.Random(it["seed"] * 1000 + gi)
+        rnd = (rng.uniform(-1, 1), rng.uniform(-1, 1), rng.random())
+        st = it["in"]
+        state = glyph_in(st, T - (wstart[wi] + k * stag), rnd, T)
+        if state is None:
+            continue
+        dx, dy, sc, rot, al, scr = state
+        if scr:
+            glitch = max(glitch, 0.6)
+        # vida en reposo: ola suave
+        dy += 5 * math.sin(T * 2.3 + gi * 0.5)
+        fx = it["fx"]
+        if fx == "shake":
+            jr = random.Random(int(T * FPS) * 31 + gi)
+            amp = 4 + 22 * kick
+            dx += jr.uniform(-amp, amp)
+            dy += jr.uniform(-amp, amp)
+            rot += jr.uniform(-4, 4) * kick
+        elif fx == "jolt" and kick > 0.45:
+            jr = random.Random(int(T * FPS) * 17 + gi)
+            dx += jr.uniform(-40, 40) * kick
+            scr = scr or jr.random() < 0.25
+            glitch = max(glitch, kick)
+        if (accent or fx == "pulse") and it["chorus"] or (fx == "pulse" and accent):
+            sc *= 1 + 0.10 * kick
+        # salida
+        out = it["out"]
+        if e > 0:
+            if out == "scatter":
+                dx += rnd[0] * 700 * e
+                dy += rnd[1] * 300 * e + 700 * e * e
+                rot += rnd[0] * 300 * e
+                al *= 1 - e
+            elif out == "fall":
+                dy += 1000 * e * e * (0.7 + 0.6 * rnd[2])
+                rot += rnd[1] * 90 * e
+                al *= 1 - e ** 2
+            elif out == "glitchout":
+                scr = scr or random.Random(int(T * 30) + gi).random() < 0.6
+                dx += rnd[0] * 50 * e * math.sin(T * 80)
+                al *= (1 - e) * (0.4 + 0.6 * ((int(T * 30) + gi) % 2))
+                glitch = max(glitch, 0.7 * (1 - e))
+        if al <= 0.01:
+            continue
+        accent2 = accent or it.get("accent_all", False)
+        if fx == "flow":
+            accent2 = math.sin(T * 7 - gi * 0.7) > 0
+        c0 = c
+        if scr:
+            c = SCRAMBLE[(int(T * 30) + gi * 7) % len(SCRAMBLE)]
+        cols = text_colors(pal, accent2)
+        g = glyph(c, it["font"], s, cols)
+        if abs(sc - 1) > 0.01 or abs(rot) > 0.5:
+            g = g.resize((max(1, int(g.width * sc)), max(1, int(g.height * sc))), Image.BILINEAR)
+            if abs(rot) > 0.5:
+                g = g.rotate(rot, Image.BILINEAR, expand=True)
+        if al < 0.999:
+            g = g.copy()
+            g.putalpha(g.getchannel("A").point(lambda v, al=al: int(v * al)))
+        px = cw / 2 + x + font(it["font"], s).getlength(c0) / 2 + dx - g.width / 2
+        py = ch / 2 + y + dy - g.height / 2
+        canvas.alpha_composite(g, (int(px), int(py)))
+    # transformacion 3D de toda la frase
+    enter = ease_out((T - (t0 - 0.35)) / 0.45)
+    dur = max(t1 - t0, 0.5)
+    z = (1 - enter) * 900 - 160 * clamp((T - t0) / dur)
+    alpha = clamp(enter * 1.6)
+    if it["out"] == "zoom" and e > 0:
+        z -= 1500 * ease_in(e)
+        alpha *= 1 - clamp(e * 1.3)
+    if alpha <= 0.01:
+        return glitch
+    sd = it["seed"]
+    yaw = 0.22 * math.sin(T * 0.55 + sd) + (1 - enter) * 0.5 * (1 if sd % 2 else -1)
+    pitch = 0.10 * math.sin(T * 0.43 + sd * 0.7) - 0.03
+    roll = 0.035 * math.sin(T * 0.31 + sd)
+    cx, cy = W / 2, it["cy"]
+    if it["chorus"] and kick > 0.15:
+        # eco que se expande con cada golpe
+        place(layer, canvas, cx, cy, z - 420 * (1.2 - kick), yaw, pitch, roll, alpha * 0.4 * kick)
+    place(layer, canvas, cx, cy, z - 70 * kick * (1 if it["chorus"] else 0.3), yaw, pitch, roll, alpha)
+    return glitch
+
+
+def lightning_layer(bolts, T, pal):
+    act = [b for b in bolts if 0 <= T - b < 0.32]
+    if not act:
+        return None
+    im = Image.new("RGBA", (SKY_W, SKY_H), (0, 0, 0, 0))
+    dr = ImageDraw.Draw(im)
+    c1 = to255(pal[0])
+    for b in act:
+        age = T - b
+        k = math.exp(-age * 9) * (0.6 + 0.4 * (int(age * 60) % 2))
+        rng = random.Random(int(b * 1000))
+        for _ in range(1 + rng.randint(0, 1)):
+            x, y = rng.uniform(SKY_W * 0.12, SKY_W * 0.88), 0.0
+            pts = [(x, y)]
+            ymax = rng.uniform(0.45, 0.7) * SKY_H
+            while y < ymax:
+                y += rng.uniform(10, 26)
+                x += rng.uniform(-24, 24)
+                pts.append((x, y))
+            col = tuple(int(v * k) for v in (230, 235, 255))
+            dr.line(pts, fill=(*col, int(255 * k)), width=3)
+            for j in range(2, len(pts) - 2, 3):
+                bx, by = pts[j]
+                br = [(bx, by)]
+                for _ in range(4):
+                    bx += rng.uniform(-22, 22)
+                    by += rng.uniform(8, 18)
+                    br.append((bx, by))
+                dr.line(br, fill=(*[int(v * k) for v in c1], int(200 * k)), width=2)
+    glow = im.filter(ImageFilter.GaussianBlur(7))
+    out = Image.alpha_composite(glow, im)
+    out = Image.alpha_composite(out, glow)
+    return out
 
 
 # ----------------------------------------------------------------------------
-# fotograma completo
+# trabajo por fotograma en procesos auxiliares (texto + rayos)
 # ----------------------------------------------------------------------------
 G = {}
 
 
-def init_worker(lines, timeline, audio, dur):
-    G.update(lines=lines, timeline=timeline, audio=audio, dur=dur)
-    # recorrido acumulado de la camara (velocidad depende de la seccion y de los graves)
-    n = len(audio["bass"])
-    travel = np.zeros(n)
-    for i in range(1, n):
-        t = i / FPS
-        w = section_weights(t, timeline)
-        sp = 6 + 10 * w.get("chorus", 0) + 5 * w.get("prechorus", 0) + 3 * w.get("verse 2", 0)
-        sp *= 0.75 + 0.6 * audio["bass"][i]
-        travel[i] = travel[i - 1] + sp / FPS
-    G["travel"] = travel
+def init_worker(items, frames_meta, bolts):
+    G.update(items=items, meta=frames_meta, bolts=bolts)
 
 
-def render_frame(i):
-    t = i / FPS
-    A, lines, timeline, dur = G["audio"], G["lines"], G["timeline"], G["dur"]
-    j = min(i, len(A["bass"]) - 1)
-    bass, kick, energy, spec = A["bass"][j], A["kick"][j], A["energy"][j], A["spec"][j]
-    w = section_weights(t, timeline)
-    pal = blend_palette(w)
-    ch = w.get("chorus", 0)
-    pre = w.get("prechorus", 0)
-    v2 = w.get("verse 2", 0)
-    v1 = w.get("verse", 0)
-    outro = w.get("outro", 0)
-    travel = G["travel"][j]
-    fade_in = smooth(t / 1.2)
-    fade_out = 1 - smooth((t - (dur - 2.2)) / 2.0)
+def text_job(i):
+    T, kick, pal = G["meta"][i]
+    pal255 = pal
+    layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    glitch = 0.0
+    for it in G["items"]:
+        glitch = max(glitch, render_item(layer, it, T, kick, pal255))
+    sky = lightning_layer(G["bolts"], T, pal)
+    return layer.tobytes(), (sky.tobytes() if sky is not None else b""), glitch
 
-    # camara
-    sway = math.sin(t * 0.35)
-    cam_y = 1.4 + 0.35 * math.sin(t * 0.5) + pre * 1.2 + outro * 1.5
-    roll = 0.06 * math.sin(t * 0.42) + ch * 0.05 * math.sin(t * 1.1)
-    pitch = -0.02 + 0.03 * math.sin(t * 0.3) - pre * 0.06
-    cam = Cam(1.2 * sway, cam_y, roll, pitch, 0.04 * math.sin(t * 0.27))
-    horizon = int(cam.proj(cam.to_cam([[cam.x, cam.y, 1e4]]))[0, 1])
 
-    # mundo 3D a media resolucion
-    bg = sky(pal, horizon)
-    img = Image.fromarray(np.clip(bg, 0, 255).astype(np.uint8), "RGB")
-    dr = ImageDraw.Draw(img)
-    sun_r = int(120 + 18 * bass)
-    sun_amt = clamp(1 - ch * 0.6)
-    if sun_amt > 0.05:
-        sun = sun_sprite(sun_r, (255, 240, 120), pal[1])
-        sp = cam.proj(cam.to_cam([[cam.x, cam.y + 900, 6000]]))[0]
-        if sun_amt < 1:
-            sun = sun.copy()
-            sun.putalpha(sun.getchannel("A").point(lambda v: int(v * sun_amt)))
-        img.paste(sun, (int(sp[0] - sun.width / 2), int(min(sp[1], horizon - sun_r * 0.35) - sun.height / 2)), sun)
-        # cortar el sol por debajo del horizonte
-        dr.rectangle([0, horizon, RW, RH], fill=(4, 0, 10))
-    floor_y = 0.0
-    draw_stars(dr, cam, travel, t, 0.6 + 0.4 * ch + outro, 6 + 10 * ch)
-    draw_grid(dr, cam, travel, floor_y, pal, 1.0, kick)
-    draw_city(dr, cam, travel, floor_y, pal, clamp(v1 + pre + v2 * 0.8 + outro * 0.6), bass)
-    draw_tunnel(dr, cam, travel, t, pal, ch, kick, bass)
-    draw_poly(dr, cam, t, pal, v2 + outro * 0.0, bass, (cam.x, cam.y + 2.2, 16), 3.2)
-    if pre > 0.3 or ch > 0.3:
-        bi = int(A["beats"][j])
-        # buscar el inicio del golpe actual
-        k0 = j
-        while k0 > 0 and A["beats"][k0 - 1] == bi and j - k0 < 10:
-            k0 -= 1
-        if bi % (1 if pre > 0.3 else 4) == 0:
-            draw_lightning(dr, bi * 7 + 1, (j - k0) / FPS, pal)
-    draw_spectrum(dr, spec, pal, 0.6)
+# ----------------------------------------------------------------------------
+# OpenGL
+# ----------------------------------------------------------------------------
+VS = """#version 330
+in vec2 in_pos; out vec2 vUV;
+void main(){ gl_Position = vec4(in_pos, 0.0, 1.0); vUV = in_pos * 0.5 + 0.5; }"""
 
-    # bloom barato + escalado a 1080p
-    small = img.resize((RW // 4, RH // 4), Image.BILINEAR).filter(ImageFilter.GaussianBlur(3))
-    glow = np.asarray(small.resize((RW, RH), Image.BILINEAR), np.float32)
-    base = np.asarray(img, np.float32)
-    base = base + glow * (1.1 + 0.8 * kick)
-    img = Image.fromarray(np.clip(base, 0, 255).astype(np.uint8), "RGB").resize((W, H), Image.BILINEAR)
 
-    # temblor en los golpes del estribillo
-    sh = (kick * (6 + 18 * ch)) if kick > 0.3 else 0
-    rng = np.random.default_rng(i)
-    shake = (rng.uniform(-sh, sh), rng.uniform(-sh, sh))
+def gl_context():
+    import moderngl
+    try:
+        return moderngl.create_standalone_context(backend="egl")
+    except Exception:
+        pass
+    if not os.environ.get("DISPLAY") and not os.environ.get("EP_XVFB"):
+        os.environ["EP_XVFB"] = "1"
+        os.execvp("xvfb-run", ["xvfb-run", "-a", "-s", "-screen 0 640x480x24", sys.executable] + sys.argv)
+    return moderngl.create_standalone_context()
 
-    frame = img.convert("RGBA")
-    for ln in lines:
-        render_line(frame, ln, t, pal, kick, ch, shake)
-    if outro > 0:
-        render_title(frame, t, timeline[-1][0] + 0.2, dur, pal, kick)
-    # etiqueta discreta
-    if t < dur - 3:
-        tag = Image.new("RGBA", (420, 60), (0, 0, 0, 0))
-        tdr = ImageDraw.Draw(tag)
-        tdr.text((0, 10), "ELECTRIC PULSE", font=font(34, True), fill=(*pal[0], 170))
-        frame.alpha_composite(tag, (60, 44))
 
-    out = np.asarray(frame.convert("RGB"), np.float32)
-    # aberracion cromatica en los golpes
-    ca = int(kick * (3 + 7 * ch))
-    if ca > 0:
-        out[..., 0] = np.roll(out[..., 0], ca, 1)
-        out[..., 2] = np.roll(out[..., 2], -ca, 1)
-    out += 38 * kick * (0.4 + ch) * (kick > 0.5)
-    out *= vignette()
-    out *= fade_in * fade_out
-    return np.clip(out, 0, 255).astype(np.uint8).tobytes()
+class Renderer:
+    def __init__(self):
+        import moderngl
+        self.mgl = moderngl
+        ctx = self.ctx = gl_context()
+        rd = lambda n: open(os.path.join(HERE, n)).read()
+        self.world = ctx.program(vertex_shader=VS, fragment_shader=rd("world.frag"))
+        self.post = ctx.program(vertex_shader=VS, fragment_shader=rd("post.frag"))
+        vbo = ctx.buffer(np.array([-1, -1, 1, -1, -1, 1, 1, 1], "f4").tobytes())
+        self.vw = ctx.vertex_array(self.world, [(vbo, "2f", "in_pos")])
+        self.vp = ctx.vertex_array(self.post, [(vbo, "2f", "in_pos")])
+        self.wtex = ctx.texture((WORLD_W, WORLD_H), 4, dtype="f2")
+        self.wtex.filter = (moderngl.LINEAR_MIPMAP_LINEAR, moderngl.LINEAR)
+        self.wtex.repeat_x = self.wtex.repeat_y = False
+        self.wfbo = ctx.framebuffer([self.wtex])
+        self.ttex = ctx.texture((W, H), 4)
+        self.ttex.filter = (moderngl.LINEAR_MIPMAP_LINEAR, moderngl.LINEAR)
+        self.ttex.repeat_x = self.ttex.repeat_y = False
+        self.stex = ctx.texture((SKY_W, SKY_H), 4)
+        self.stex.filter = (moderngl.LINEAR, moderngl.LINEAR)
+        self.empty_sky = bytes(SKY_W * SKY_H * 4)
+        self.otex = ctx.texture((W, H), 3)
+        self.ofbo = ctx.framebuffer([self.otex])
+
+    @staticmethod
+    def _set(prog, name, val):
+        if name in prog:
+            prog[name].value = val
+
+    def render(self, f, text_bytes, sky_bytes, text_glitch, fade):
+        s = self._set
+        pw = self.world
+        self.stex.write(sky_bytes or self.empty_sky)
+        self.stex.use(1)
+        s(pw, "uSkyFx", 1)
+        s(pw, "uRes", (WORLD_W, WORLD_H))
+        s(pw, "uTime", f["T"])
+        s(pw, "uScene", 1 if f["hall"] else 0)
+        s(pw, "uCamPos", f["pos"])
+        s(pw, "uCamTgt", f["tgt"])
+        s(pw, "uRoll", f["roll"])
+        s(pw, "uFov", f["fov"])
+        s(pw, "uBass", f["bass"])
+        s(pw, "uKick", f["kick"])
+        s(pw, "uFlash", f["flash"])
+        s(pw, "uCol1", f["pal"][0])
+        s(pw, "uCol2", f["pal"][1])
+        s(pw, "uFog", f["pal"][2])
+        s(pw, "uPulseR", f["pulseR"])
+        s(pw, "uPulseA", f["pulseA"])
+        s(pw, "uPulseC", f["pulseC"])
+        s(pw, "uWin", f["win"])
+        s(pw, "uStrobe", f["strobe"])
+        s(pw, "uLaser", f["laser"])
+        s(pw, "uCars", f["cars"])
+        self.wfbo.use()
+        self.vw.render(self.mgl.TRIANGLE_STRIP)
+        self.wtex.build_mipmaps()
+        self.ttex.write(text_bytes)
+        self.ttex.build_mipmaps()
+        self.wtex.use(0)
+        self.ttex.use(2)
+        pp = self.post
+        s(pp, "uWorld", 0)
+        s(pp, "uText", 2)
+        s(pp, "uRes", (W, H))
+        s(pp, "uTime", f["T"])
+        s(pp, "uKick", f["kick"])
+        s(pp, "uChroma", f["chroma"] + 2.0 * text_glitch)
+        s(pp, "uGlitch", clamp(f["glitch"] + 0.5 * text_glitch))
+        s(pp, "uFlashScr", f["flash_scr"])
+        s(pp, "uFade", fade)
+        s(pp, "uRain", f["rain"])
+        s(pp, "uGlow", 0.75)
+        self.ofbo.use()
+        self.vp.render(self.mgl.TRIANGLE_STRIP)
+        return self.ofbo.read(components=3)
 
 
 # ----------------------------------------------------------------------------
 def main():
-    dur = float(subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", AUDIO],
-        capture_output=True, text=True, check=True).stdout)
+    gl_context()  # si hace falta, se relanza bajo xvfb-run antes del trabajo pesado
+    build_audio()
+    dur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", AUDIO],
+                               capture_output=True, text=True, check=True).stdout)
     lines = load_lyrics()
-    timeline = build_timeline(lines, dur)
-    print("secciones:", timeline)
+    secs = build_sections(lines, dur)
+    print("secciones:", [(n, round(a, 2), round(b, 2)) for n, a, b in secs], flush=True)
     audio = analyze_audio(dur)
+    nframes = int(dur * FPS)
+    frames, bolts = build_frames(secs, audio, nframes, lines)
+    items = make_items(lines) + intro_outro_items(secs[-1][1], dur)
+    meta = [(f["T"], f["kick"], f["pal"]) for f in frames]
 
+    def fade(T):
+        return smooth(T / 0.7) * (1 - smooth((T - (dur - 2.6)) / 2.4))
+
+    rend = Renderer()
     if "--stills" in sys.argv:
-        secs = [float(x) for x in sys.argv[sys.argv.index("--stills") + 1:]]
+        secs_req = [float(x) for x in sys.argv[sys.argv.index("--stills") + 1:]]
         os.makedirs(os.path.join(HERE, "stills"), exist_ok=True)
-        init_worker(lines, timeline, audio, dur)
-        for s in secs:
-            buf = render_frame(int(s * FPS))
-            Image.frombytes("RGB", (W, H), buf).save(os.path.join(HERE, "stills", f"t{s:06.2f}.png"))
-            print("still", s)
+        init_worker(items, meta, bolts)
+        for sT in secs_req:
+            i = min(int(sT * FPS), nframes - 1)
+            tb, sb, g = text_job(i)
+            buf = rend.render(frames[i], tb, sb, g, fade(frames[i]["T"]))
+            Image.frombytes("RGB", (W, H), buf).transpose(Image.FLIP_TOP_BOTTOM).save(
+                os.path.join(HERE, "stills", f"t{sT:06.2f}.png"))
+            print("still", sT, flush=True)
         return
 
-    nframes = int(dur * FPS)
+    os.makedirs(BUILD, exist_ok=True)
     ff = subprocess.Popen(
-        ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",
-         "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-", "-i", AUDIO,
-         "-map", "0:v", "-map", "1:a", "-c:v", "libx264", "-preset", "slow", "-b:v", "5600k", "-maxrate", "9000k", "-bufsize", "12000k",  # < 100 MB (limite GitHub)
-         "-tune", "animation", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "256k",
-         "-movflags", "+faststart", "-shortest", OUT], stdin=subprocess.PIPE)
-    with Pool(os.cpu_count(), initializer=init_worker, initargs=(lines, timeline, audio, dur)) as pool:
-        for k, buf in enumerate(pool.imap(render_frame, range(nframes), chunksize=4)):
-            ff.stdin.write(buf)
-            if k % 150 == 0:
-                print(f"frame {k}/{nframes}", flush=True)
+        ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}",
+         "-r", str(FPS), "-i", "-", "-vf", "vflip", "-c:v", "libx264", "-preset", "medium", "-crf", "16",
+         "-pix_fmt", "yuv420p", MASTER], stdin=subprocess.PIPE)
+    batch = 16
+    with Pool(2, initializer=init_worker, initargs=(items, meta, bolts)) as pool:
+        nxt = pool.map_async(text_job, range(0, min(batch, nframes)))
+        for b0 in range(0, nframes, batch):
+            res = nxt.get()
+            b1 = b0 + batch
+            if b1 < nframes:
+                nxt = pool.map_async(text_job, range(b1, min(b1 + batch, nframes)))
+            for k, (tb, sb, g) in enumerate(res):
+                i = b0 + k
+                ff.stdin.write(rend.render(frames[i], tb, sb, g, fade(frames[i]["T"])))
+            if (b0 // batch) % 10 == 0:
+                print(f"frame {b0}/{nframes}", flush=True)
     ff.stdin.close()
     ff.wait()
-    print("listo:", OUT)
+    # codificacion final en dos pasadas para quedar por debajo de 100 MB (limite de GitHub)
+    vbit = int((92 * 8 * 1024) / dur - 192)
+    common = ["-c:v", "libx264", "-preset", "slow", "-b:v", f"{vbit}k", "-pix_fmt", "yuv420p"]
+    plog = os.path.join(BUILD, "x264pass")
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", MASTER] + common +
+                   ["-pass", "1", "-passlogfile", plog, "-an", "-f", "null", "-"], check=True)
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", MASTER, "-i", AUDIO, "-map", "0:v", "-map", "1:a"] +
+                   common + ["-pass", "2", "-passlogfile", plog, "-c:a", "aac", "-b:a", "192k",
+                             "-movflags", "+faststart", "-shortest", OUT], check=True)
+    print("listo:", OUT, flush=True)
 
 
 if __name__ == "__main__":
