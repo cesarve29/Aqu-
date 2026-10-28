@@ -115,7 +115,7 @@ def _render_chunk(args):
     idx, n0, n1, path = args
     cmd = ['ffmpeg', '-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24',
            '-s', '%dx%d' % (W, H), '-r', str(FPS), '-i', '-',
-           '-c:v', 'libx264', '-preset', 'medium', '-crf', '21', '-tune', 'animation',
+           '-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-tune', 'animation',
            '-pix_fmt', 'yuv420p', path]
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
     for n in range(n0, n1):
@@ -154,9 +154,16 @@ def main():
     with open(lst, 'w') as f:
         for p in files:
             f.write("file '%s'\n" % p)
-    subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', lst, '-i', wav,
-                    '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-shortest',
-                    '-movflags', '+faststart', out], check=True)
+    # pasada final a bitrate fijo (~85 MB, por debajo del limite de 100 MB de GitHub)
+    enc = ['ffmpeg', '-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', lst, '-i', wav,
+           '-map', '0:v', '-map', '1:a', '-c:v', 'libx264', '-preset', 'slow', '-tune', 'animation',
+           '-b:v', '3800k', '-pix_fmt', 'yuv420p', '-passlogfile', os.path.join(tmp, 'x264')]
+    subprocess.run(enc + ['-pass', '1', '-an', '-f', 'mp4', os.devnull], check=True)
+    subprocess.run(enc + ['-pass', '2', '-c:a', 'aac', '-b:a', '160k', '-shortest',
+                          '-movflags', '+faststart', out], check=True)
+    for f in os.listdir(tmp):
+        if f.startswith('x264'):
+            os.remove(os.path.join(tmp, f))
     for p in files:
         os.remove(p)
     os.remove(lst)
