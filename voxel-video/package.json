@@ -1,0 +1,9 @@
+{
+  "name": "blockcraft-video",
+  "private": true,
+  "description": "Video voxel 3D con shaders generado por codigo (Three.js + Chromium headless + ffmpeg)",
+  "dependencies": {
+    "three": "0.160.0"
+  },
+  "type": "module"
+}
