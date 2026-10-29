@@ -10,7 +10,7 @@ cd "$(dirname "$0")"
 python3 subtitles.py
 [ -f audio/soundtrack.wav ] || python3 soundtrack.py
 [ -f audio/mezcla.wav ] || python3 voiceover.py
-ls renders/scene_*.mp4 | sort | sed "s/^/file '/; s/$/'/" > renders/list.txt
+(cd renders && ls scene_*.mp4 | sort | sed "s/^/file '/; s/$/'/") > renders/list.txt
 ffmpeg -y -loglevel error -f concat -safe 0 -i renders/list.txt -c copy renders/all.mp4
 OUT=${OUT:-la_mascara_del_eco_azul_1080p60.mp4}
 ffmpeg -y -loglevel error -i renders/all.mp4 -i audio/mezcla.wav \
