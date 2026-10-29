@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Miniatura de YouTube (1280x720) a partir de cuadros del render: thumbnail.png"""
+"""Miniatura de YouTube a partir de cuadros del render: thumbnail.png (1280x720) y thumbnail_1080p.png (1920x1080)"""
 import os
 import subprocess
 import tempfile
@@ -73,9 +73,10 @@ def main():
     glow_text(img, (70, 190), 'LA MÁSCARA', f_big, (255, 255, 255), (80, 170, 255, 210))
     glow_text(img, (78, 400), 'DEL ECO', f_mid, (120, 205, 255), (30, 120, 255, 200))
     glow_text(img, (78, 540), 'AZUL', f_mid, (120, 205, 255), (30, 120, 255, 200))
-    out = img.convert('RGB').resize((1280, 720), Image.LANCZOS)
-    out.save(os.path.join(HERE, 'thumbnail.png'), optimize=True)
-    print('ok', os.path.join(HERE, 'thumbnail.png'))
+    full = img.convert('RGB')
+    full.save(os.path.join(HERE, 'thumbnail_1080p.png'), optimize=True)
+    full.resize((1280, 720), Image.LANCZOS).save(os.path.join(HERE, 'thumbnail.png'), optimize=True)
+    print('ok thumbnail.png (1280x720) + thumbnail_1080p.png (1920x1080)')
 
 
 if __name__ == '__main__':
