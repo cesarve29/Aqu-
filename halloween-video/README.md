@@ -3,7 +3,7 @@
 Video generado 100 % por código: mundo de vóxeles en Three.js renderizado cuadro a cuadro
 en Chromium sin interfaz (WebGL por software), con post-proceso tipo *shaders*
 (bloom, tone mapping ACES, niebla volumétrica, haces de luz, viñeta, grano),
-banda sonora sintetizada con NumPy y subtítulos de narración en español.
+banda sonora sintetizada con NumPy, voz en off grave generada con ElevenLabs ("Alejandro – Horror y Misterio") y subtítulos en español.
 
 El protagonista usa la skin de referencia (`ref/personaje.jpg`): túnica negra con capucha
 y máscara blanca que grita.
@@ -26,6 +26,7 @@ Requisitos: Node 18+, Playwright con Chromium, Python 3 con NumPy, ffmpeg con li
 npm install                 # three.js
 ./render_all.sh             # 26 escenas -> renders/scene_XX.mp4 (≈0.7 s por cuadro en CPU; se puede reanudar)
 python3 soundtrack.py       # audio/soundtrack.wav
+python3 voiceover.py        # voz en off (voz/narracion_take1.mp3, ElevenLabs) + música -> audio/mezcla.wav
 ./make_video.sh             # une escenas + audio + subtítulos -> la_mascara_del_eco_azul_1080p60.mp4
 ```
 
