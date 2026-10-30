@@ -4,18 +4,20 @@ EchoBot - ELECTRIC HEARTBEAT (video musical 3D, 1920x1080 a 60 fps)
 
 Mundo 3D por raymarching en GLSL (OpenGL via moderngl; en servidores sin GPU corre en
 llvmpipe bajo Xvfb) con acabado de render tipo Blender/Cycles: oclusion ambiental,
-reflejos con Fresnel, sombras suaves, vidrio emisivo, profundidad de campo con bokeh,
+reflejos con Fresnel, sombras suaves, cromo y metal liquido, profundidad de campo con bokeh,
 bloom, destellos anamorficos, aberracion de lente y grano de pelicula.
 
-Guion visual:
-  intro      monitor cardiaco (ECG) que late + descenso sobre la ciudad; artista y titulo
-  verse      ciudad de neon viva bajo un corazon gigante de cristal que late con el bombo
-  prechorus  la camara sube hacia el corazon, arcos electricos a su alrededor
-  chorus     dentro de la arteria electrica: venas de luz, globulos de energia, pulsos
+Guion visual (todo reacciona al bombo, los graves y la energia de la cancion):
+  intro      monitor cardiaco (ECG) + descenso sobre la ciudad; artista y titulo
+  verse      vuelo por la avenida de neon atravesando portales de cromo que se encienden
+             con cada golpe; laseres que barren el cielo desde las azoteas
+  prechorus  la camara acelera y sube entre los laseres
+  chorus     tunel fractal de cromo que se repliega con cada golpe; cortes cada 4 golpes
   verse 2    la ciudad se apaga y se vuelve gris... hasta que una chispa la atraviesa
-  prechorus2 la arteria otra vez, acelerando ("voltage rising")
-  chorus 2   la camara del corazon: corazon colosal, pilares y descargas electricas
-  outro      la camara se aleja; titulo, artista y el trazo del ECG
+  prechorus2 el tunel fractal otra vez, acelerando ("voltage rising")
+  chorus 2   el reactor: nucleo de metal liquido, anillos giroscopicos, laseres, arcos
+             y cortes de camara cada 4 golpes con cambio de color
+  outro      la camara se aleja del reactor; titulo, artista y el trazo del ECG
 
 Las letras son tipografia cinetica 3D animada letra a letra, sincronizada con los tiempos
 incrustados en el .m4a, y ademas se incluyen como pista de subtitulos (SRT/mov_text).
@@ -237,7 +239,7 @@ PALETTES = {
 }
 SCENE = {"intro": 0, "verse": 0, "prechorus": 0, "chorus": 1, "verse 2": 0,
          "prechorus 2": 1, "chorus 2": 2, "outro": 2}
-CHAMBER_HEART = (0.0, 30.0, 0.0, 17.0)
+CORE = (0.0, 26.0, 0.0, 13.0)
 
 
 def build_sections(lines, dur):
@@ -261,23 +263,27 @@ def section_at(T, secs):
 
 
 def city_pose(name, T, st, en):
-    """(x, y, yaw, pitch, roll, fov, speed, heart_dist, heart_y)"""
+    """(x, y, yaw, pitch, roll, fov, speed)"""
     u = T - st
     p = clamp(u / max(en - st, 1e-3))
     if name == "intro":
         k = smooth((T - 2.4) / (INTRO - 2.4))
-        return (0.0, lerp(190, 9, k ** 0.8), 0.0, lerp(-1.2, 0.12, smooth((T - 2.4) / (INTRO - 2.6))), 0.0,
-                1.15, 20, 300, 108)
+        return (0.0, lerp(190, 7, k ** 0.8), 0.0, lerp(-1.2, 0.08, smooth((T - 2.4) / (INTRO - 2.6))), 0.0, 1.15, 26)
     if name == "verse":
-        return (3 * math.sin(u * 0.21), 7 + 2.5 * math.sin(u * 0.35), 0.12 * math.sin(u * 0.17),
-                0.14 + 0.04 * math.sin(u * 0.3), -0.05 * math.cos(u * 0.21), 1.2, 22, 300, 108)
+        return (3 * math.sin(u * 0.21), 7 + 2.0 * math.sin(u * 0.35), 0.12 * math.sin(u * 0.17),
+                0.08 + 0.04 * math.sin(u * 0.3), -0.06 * math.cos(u * 0.21), 1.15, 30)
     if name == "prechorus":
-        return (2 * math.sin(u * 0.4), 8 + 52 * p ** 1.4, 0.1 * math.sin(u * 0.5),
-                0.14 + 0.12 * math.sin(math.pi * min(p * 1.1, 1)), 0.1 * math.sin(u * 0.9), lerp(1.15, 0.95, p),
-                lerp(22, 55, p), lerp(300, 170, smooth(p)), lerp(108, 112, p))
+        return (2 * math.sin(u * 0.4), 7 + 45 * p ** 1.6, 0.1 * math.sin(u * 0.5),
+                0.08 + 0.2 * math.sin(math.pi * min(p * 1.1, 1)), 0.12 * math.sin(u * 0.9), lerp(1.15, 0.9, p),
+                lerp(30, 70, p))
     # verse 2: calle baja, lenta, ciudad muriendo
-    return (2.2 * math.sin(u * 0.27), 4.0 + 0.8 * math.sin(u * 0.5), 0.15 * math.sin(u * 0.19),
-            0.13, 0.05 * math.sin(u * 0.3), 1.12, 15, 300, 108)
+    return (2.2 * math.sin(u * 0.27), 5.0 + 0.8 * math.sin(u * 0.5), 0.15 * math.sin(u * 0.19),
+            0.08, 0.05 * math.sin(u * 0.3), 1.12, 18)
+
+
+def fold_for(ki):
+    """Pliegue del fractal: un valor nuevo en cada golpe."""
+    return 0.25 + 0.3 * math.sin(ki * 1.71) + 0.12 * math.sin(ki * 0.37)
 
 
 def build_frames(secs, audio, nframes, lines):
@@ -287,7 +293,8 @@ def build_frames(secs, audio, nframes, lines):
     spark_t = next((l["t0"] for l in lines if l["text"].lower().startswith("but your spark")), sec_d["verse 2"][0] + 6)
     frames = []
     travel = 0.0      # avance de la camara en la ciudad
-    tz = 0.0          # avance en la arteria
+    tz = 0.0          # avance en el tunel
+    rings = [0.0, 1.0, 2.0]
     for i in range(nframes):
         T = i / FPS
         k, name, st, en = section_at(T, secs)
@@ -296,104 +303,126 @@ def build_frames(secs, audio, nframes, lines):
         scene = SCENE[name]
         j = min(i, len(audio["bass"]) - 1)
         bass, kick = float(audio["bass"][j]), float(audio["kick"][j])
-        ki = np.searchsorted(kicks, T, side="right") - 1
+        energy = float(audio["energy"][j])
+        ki = int(np.searchsorted(kicks, T, side="right") - 1)
         kt = kicks[ki] if ki >= 0 else -99
         age = T - kt
-        # latido "lub-dub" a partir del bombo
-        beat = math.exp(-age * 7.0) + (0.55 * math.exp(-(age - 0.17) * 9.0) if age > 0.17 else 0.0)
+        beat = math.exp(-age * 6.0)
         if name == "intro":
             ph = ((T - 0.335 * HB_PERIOD) % HB_PERIOD)
             beat = math.exp(-ph * 7.0) + (0.55 * math.exp(-(ph - 0.17) * 9.0) if ph > 0.17 else 0.0)
         beat = clamp(beat, 0, 1.2)
+        # golpes dentro de la seccion -> planos (un corte cada 4 golpes)
+        k0 = int(np.searchsorted(kicks, st, side="left"))
+        nk = max(0, ki - k0 + 1)
+        shot = nk // 4
+        shot_t = kicks[k0 + shot * 4 - 1] if shot > 0 else st
         decay, spark, spark_pos = 0.0, 0.0, (0.0, 0.0, 0.0)
-        arcs = 0.0
+        arcs, lasers = 0.0, 0.0
         flash = 0.0
+        cutflash = 0.0
         tint = (1.0, 1.0, 1.0)
         if name == "intro":
-            # el mundo aparece tras el monitor cardiaco
             wf = 0.03 + 0.97 * smooth((T - 1.9) / 2.2)
             tint = (wf, wf, wf)
-        focus, aperture = 60.0, 1.2
+        focus, aperture = 60.0, 1.0
         roll = 0.0
+        # anillos del reactor: giran mas rapido con la energia y dan un tiron en cada golpe
+        for r in range(3):
+            rings[r] += (0.25 + 0.9 * energy + 2.5 * kick) * (1.0 + 0.35 * r) * (1 if r != 1 else -1) / FPS
+        fold = lerp(fold_for(ki - 1), fold_for(ki), smooth(age / 0.16))
         if scene == 0:
-            # mezcla suave de camara al pasar de la intro al verso
             pose = city_pose(name, T, st, en)
             if name == "verse" and u < 1.0:
                 pose = tuple(lerp(a, b, smooth(u)) for a, b in zip(city_pose("intro", T, secs[0][1], secs[0][2]), pose))
-            x, y, yaw, pitch, roll, fov, spd, hd, hy = pose
-            travel += spd * (0.85 + 0.35 * bass) / FPS
+            x, y, yaw, pitch, roll, fov, spd = pose
+            travel += spd * (0.85 + 0.35 * bass + 0.5 * kick) / FPS
             fwd = (math.sin(yaw) * math.cos(pitch), math.sin(pitch), math.cos(yaw) * math.cos(pitch))
             pos = (x, y, travel)
             tgt = (x + fwd[0], y + fwd[1], travel + fwd[2])
-            heart = (0.0, hy, travel + hd, 48.0)
+            lasers = {"intro": 0.5 * smooth((T - 3.0) / 2.0), "verse": 0.55 + 0.6 * kick,
+                      "prechorus": 0.8 + 1.0 * kick, "verse 2": 0.0}[name]
             if name == "verse 2":
                 ts = spark_t
                 decay = 0.9 * smooth(u / 4.0) * (1 - smooth((T - ts - 0.9) / 1.6))
                 beat *= 1 - 0.75 * decay
+                lasers = (0.8 + 1.0 * kick) * smooth((T - ts - 0.8) / 0.8)
                 if ts - 0.6 < T < ts + 2.2:
                     a = (T - (ts - 0.6)) / 2.8
                     spark = smooth(a / 0.1) * (1 - smooth((a - 0.85) / 0.15))
                     spark_pos = (x + 6 * math.sin(a * 5), y + 1.5 + 2 * math.sin(a * 3), travel + lerp(140, -10, a))
                     flash = 0.35 * math.exp(-max(0.0, T - ts - 0.9) * 4) if T > ts + 0.9 else 0.0
                 tint = lerp3((0.82, 0.86, 0.95), (1.0, 1.0, 1.0), 1 - decay)
-            if name == "prechorus":
-                arcs = (0.4 + 0.8 * kick) * smooth(p * 2)
-            focus = max(5.0, hd - 40) if name in ("intro", "prechorus") else 45.0
-            aperture = 0.6 if name == "intro" else 1.0
+            focus = 40.0
+            aperture = 0.6 if name == "intro" else 0.9
         elif scene == 1:
             accel = name == "prechorus 2"
-            spd = (lerp(26, 70, p ** 1.5) if accel else 48) * (0.85 + 0.35 * bass)
+            spd = (lerp(22, 60, p ** 1.5) if accel else 38) * (0.85 + 0.35 * bass + 0.6 * kick)
             tz += spd / FPS
             cx, cy = t_path(tz)
             ax, ay = t_path(tz + 9)
-            orb = 1.6 + 0.6 * math.sin(u * 0.7)
-            ox, oy = orb * math.cos(u * 0.45), orb * math.sin(u * 0.45) * 0.6
+            # en el estribillo cada plano cambia de giro y posicion dentro del tunel
+            rng = random.Random(shot * 31 + k * 7)
+            ph = rng.uniform(0, 6.28) if not accel else 0.0
+            orb = 0.9 + 0.4 * math.sin(u * 0.7)
+            ox, oy = orb * math.cos(u * 0.45 + ph), orb * math.sin(u * 0.45 + ph) * 0.6
             pos = (cx + ox, cy + oy, tz)
-            tgt = (ax + ox * 0.4, ay + oy * 0.4, tz + 9)
-            roll = 0.25 * math.sin(u * 0.33) + (0.6 * p ** 2 * math.sin(u * 1.4) if accel else 0.0)
-            fov = (1.0 - 0.25 * p) if accel else 0.95
-            fov -= 0.08 * kick
-            heart = (0.0, -999.0, 0.0, 1.0)
-            focus, aperture = 16.0, 0.8
+            tgt = (ax + ox * 0.3, ay + oy * 0.3, tz + 9)
+            roll = (rng.uniform(-0.9, 0.9) if not accel else 0.0) + 0.25 * math.sin(u * 0.33)
+            roll += 0.8 * p ** 2 * math.sin(u * 1.4) if accel else 0.0
+            fov = (0.95 - 0.25 * p) if accel else 0.9
+            fov -= 0.1 * kick
+            if not accel and shot > 0:
+                cutflash = 0.3 * math.exp(-(T - shot_t) * 10)
+            focus, aperture = 12.0, 0.7
         else:
-            hx, hy, hz, hs = CHAMBER_HEART
-            heart = CHAMBER_HEART
+            hx, hy, hz, hs = CORE
+            lasers = 0.6 + 1.2 * kick
+            arcs = 0.3 + 1.0 * kick
             if name == "chorus 2":
-                ang = -1.2 + u * 0.16
-                rad = lerp(58, 38, smooth(p * 1.4)) + 5 * math.sin(u * 0.4)
-                cyy = 16 + 12 * math.sin(u * 0.23) + 8 * smooth(p)
-                fov = 1.05 - 0.07 * kick
-                roll = 0.08 * math.sin(u * 0.3)
-                arcs = 0.35 + 0.9 * kick
+                # cortes de camara cada 4 golpes: angulo, distancia y altura nuevas
+                rng = random.Random(shot * 97 + 13)
+                ang = rng.uniform(0, 6.28) + (T - shot_t) * rng.choice((-0.25, 0.25))
+                rad = rng.uniform(34, 62) - (T - shot_t) * 2.0
+                cyy = rng.choice((4.0, 14.0, 30.0, 48.0)) + 2 * math.sin(u)
+                fov = rng.uniform(0.9, 1.25) - 0.08 * kick
+                roll = rng.uniform(-0.25, 0.25)
+                if shot > 0:
+                    cutflash = 0.35 * math.exp(-(T - shot_t) * 10)
             else:
-                ang = -1.2 + (sec_d["chorus 2"][1] - sec_d["chorus 2"][0]) * 0.16 + u * 0.07
-                rad = lerp(42, 190, smooth(p * 1.1))
-                cyy = lerp(30, 120, smooth(p * 1.15))
+                ang = 0.8 + u * 0.07
+                rad = lerp(45, 64, smooth(p * 1.1))
+                cyy = lerp(20, 105, smooth(p * 1.15))
                 fov = 1.15
                 roll = 0.05 * math.sin(u * 0.2)
-                arcs = (0.3 + 0.8 * kick) * (1 - smooth(p * 1.4))
+                lasers *= 1 - smooth(p * 1.2)
+                arcs *= 1 - smooth(p * 1.4)
             pos = (hx + rad * math.cos(ang), cyy, hz + rad * math.sin(ang))
-            tgt = (hx, hy + 3, hz)
-            focus = math.dist(pos, (hx, hy, hz)) - hs * 0.4
-            aperture = 2.2
-        # paleta con fundido corto entre secciones
+            tgt = (hx, hy, hz)
+            focus = math.dist(pos, (hx, hy, hz)) - hs * 0.5
+            aperture = 2.0
+        # paleta con fundido corto entre secciones; en los estribillos los colores se intercambian en cada corte
         pal = PALETTES[name]
+        if name in ("chorus", "chorus 2") and shot % 2 == 1:
+            pal = (pal[1], pal[0], pal[2])
         if k > 0 and u < 0.6:
             pal = tuple(lerp3(a, b, smooth(u / 0.6)) for a, b in zip(PALETTES[secs[k - 1][0]], pal))
         chorus = name in ("chorus", "chorus 2")
         cut = u
         frames.append({
             "T": T, "section": name, "k": k, "scene": scene,
-            "pos": pos, "tgt": tgt, "roll": roll, "fov": fov - (0.04 * kick if chorus and scene == 0 else 0.0),
+            "pos": pos, "tgt": tgt, "roll": roll, "fov": fov,
             "bass": bass, "kick": kick, "beat": beat, "pal": pal, "flash": flash,
             "pulseR": age * (95.0 if scene == 0 else (70.0 if scene == 1 else 60.0)),
-            "pulseA": math.exp(-age * 2.0) * (1.0 if (chorus or name in ("prechorus", "prechorus 2", "outro")) else 0.35),
-            "kt": kt, "heart": heart, "decay": decay, "spark": spark, "spark_pos": spark_pos,
-            "arcs": arcs, "seed": float(ki % 97), "tint": tint, "focus": focus, "aperture": aperture,
+            "pulseA": math.exp(-age * 2.0) * (1.0 if (chorus or name in ("prechorus", "prechorus 2", "outro")) else 0.45),
+            "kt": kt, "decay": decay, "spark": spark, "spark_pos": spark_pos,
+            "arcs": arcs, "lasers": lasers, "fold": fold, "rings": tuple(rings), "core": CORE,
+            "seed": float(ki % 97), "tint": tint, "focus": focus, "aperture": aperture,
             "win": smooth((T - 2.6) / 3.0) if name == "intro" else 1.0,
-            "flash_scr": (0.55 * math.exp(-cut * 8) if k > 1 else 0.0) + (0.04 * kick if chorus else 0.0) + 0.3 * flash,
-            "glitch": clamp(1 - cut / 0.25) if k > 1 else 0.0,
-            "chroma": (1.2 * kick if chorus else 0.4 * kick),
+            "flash_scr": (0.55 * math.exp(-cut * 8) if k > 1 else 0.0) + (0.05 * kick if chorus else 0.0) + 0.3 * flash + cutflash,
+            "glitch": max(clamp(1 - cut / 0.25) if k > 1 else 0.0,
+                          clamp(1 - (T - shot_t) / 0.12) if chorus and shot > 0 else 0.0),
+            "chroma": (1.3 * kick if chorus else 0.5 * kick),
         })
     # el centro de cada onda expansiva queda fijo donde estaba la camara al sonar el bombo
     zmap = {round(f["T"] * FPS): f["pos"][2] for f in frames}
@@ -903,7 +932,10 @@ class Renderer:
         s(pw, "uDecay", f["decay"])
         s(pw, "uSpark", f["spark"])
         s(pw, "uSparkPos", f["spark_pos"])
-        s(pw, "uHeart", f["heart"])
+        s(pw, "uCore", f["core"])
+        s(pw, "uRingRot", f["rings"])
+        s(pw, "uFold", f["fold"])
+        s(pw, "uLasers", f["lasers"])
         s(pw, "uArcs", f["arcs"])
         s(pw, "uSeed", f["seed"])
         self.wfbo.use()
