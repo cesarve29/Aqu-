@@ -1041,7 +1041,7 @@ def finish(dur):
                    ["-pass", "2", "-passlogfile", plog, "-c:a", "aac", "-b:a", "192k", "-c:s", "mov_text",
                     "-metadata:s:s:0", "language=eng", "-metadata:s:s:0", "title=Lyrics",
                     "-metadata", f"title={ARTIST.title()} - Electric Heartbeat", "-metadata", "artist=EchoBot",
-                    "-movflags", "+faststart", "-shortest", OUT], check=True)
+                    "-movflags", "+faststart", "-t", f"{dur:.3f}", OUT], check=True)
     print("listo:", OUT, flush=True)
 
 
