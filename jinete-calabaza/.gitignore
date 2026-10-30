@@ -1,0 +1,8 @@
+node_modules/
+renders/
+stills/
+*.tmp.mp4
+audio/
+render_log*.txt
+adelanto_*.mp4
+el_jinete_*.mp4
