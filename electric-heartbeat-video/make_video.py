@@ -986,12 +986,14 @@ def main():
 
     rend = Renderer()
     if "--stills" in sys.argv:
-        secs_req = [float(x) for x in sys.argv[sys.argv.index("--stills") + 1:]]
+        secs_req = [float(x) for x in sys.argv[sys.argv.index("--stills") + 1:] if not x.startswith("--")]
         os.makedirs(os.path.join(HERE, "stills"), exist_ok=True)
         init_worker(items, meta, dur)
         for sT in secs_req:
             i = min(int(sT * FPS), nframes - 1)
             tb, g = text_job(i)
+            if "--clean" in sys.argv:  # fondo sin letras (miniaturas)
+                tb, g = bytes(len(tb)), 0.0
             buf = rend.render(frames[i], tb, g, fade(frames[i]["T"]))
             Image.frombytes("RGB", (W, H), buf).transpose(Image.FLIP_TOP_BOTTOM).save(
                 os.path.join(HERE, "stills", f"t{sT:06.2f}.png"))
