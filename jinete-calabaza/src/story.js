@@ -159,6 +159,8 @@ function villageNight(S, lt, ctx) {
   S.ghostFlame.mesh.visible = false;
   S.goldDust.points.visible = false;
   S.mtnGlow.userData.u.uTime.value = ctx.t;
+  S.mountain.visible = false;
+  S.mtnGlow.visible = false;
 }
 function villageDawn(S, lt, ctx) {
   villageNight(S, lt, ctx);
@@ -774,6 +776,7 @@ const SC = [
     update(lt, ctx) {
       const S = ctx.set;
       villageNight(S, lt, ctx);
+      S.mountain.visible = true; S.mtnGlow.visible = true;
       lanternState(S, 'off');
       S.bonfire.set(ctx.t, { flare: 0.35, bright: 0.8 });
       S.bonLight.intensity = 12;
@@ -814,6 +817,7 @@ const SC = [
     update(lt, ctx) {
       const S = ctx.set;
       villageNight(S, lt, ctx);
+      S.mountain.visible = true; S.mtnGlow.visible = true;
       lanternState(S, 'off');
       S.bonfire.set(ctx.t, { flare: 0.35, bright: 0.8 });
       S.bonLight.intensity = 12;
