@@ -737,16 +737,16 @@ def creature_face(name="creature", scale=1.0, loc=(0, 0, 0), grin=1.0):
         front = max(0.0, -y)
         for e in eyes:
             d = (p - e).length
-            if d < 0.36:
-                q -= n * 0.3 * (1 - smooth(d / 0.36))
+            if d < 0.38:
+                q -= n * 0.38 * (1 - smooth(d / 0.38))
             # arco superciliar
             bd = (p - (e + Vector((0, 0, 0.2)))).length
             if bd < 0.25:
                 q += n * 0.06 * (1 - smooth(bd / 0.25))
         for c in cheeks:
             d = (p - c).length
-            if d < 0.35:
-                q -= n * 0.12 * (1 - smooth(d / 0.35))
+            if d < 0.38:
+                q -= n * 0.22 * (1 - smooth(d / 0.38))
         # nariz: casi inexistente, dos ranuras
         for sx_ in (0.06, -0.06):
             d = (p - Vector((sx_, -1.0, -0.06))).length
@@ -770,16 +770,16 @@ def creature_face(name="creature", scale=1.0, loc=(0, 0, 0), grin=1.0):
     root = empty(name + "_root", loc)
     ob.location = (0, 0, 0)
     ob.parent = root
-    black = principled("eyeblack", base=(0.0, 0.0, 0.0), rough=0.05, coat=1.0)
+    black = principled("eyeblack", base=(0.0, 0.0, 0.0), rough=1.0)
     for e in eyes:
         eb = prim("sphere", loc=(0, 0, 0), scale=(0.17, 0.12, 0.15), mat=black)
-        eb.location = (e.x * 0.78 * 0.95, e.y * 0.86 + 0.13, e.z * 1.18)
+        eb.location = (e.x * 0.78 * 0.92, e.y * 0.86 + 0.2, e.z * 1.18)
         shade_smooth(eb)
         eb.parent = ob
     # interior de la boca + dientes
     dark = principled("mouth", base=(0.02, 0.0, 0.0), rough=0.6)
     teeth = principled("teeth", base=(0.75, 0.68, 0.5), rough=0.3, sss=0.2)
-    mo = prim("sphere", loc=(0, -0.62, -0.42 * 1.18), scale=(0.55, 0.2, 0.09), mat=dark)
+    mo = prim("sphere", loc=(0, -0.45, -0.42 * 1.18), scale=(0.5, 0.15, 0.07), mat=dark)
     mo.parent = ob
     for i in range(-11, 12):
         x = i * 0.055
@@ -1568,6 +1568,28 @@ def s16_title():
         sweep.data.energy = 1500 * f
         rimL.data.energy = 80 * f
         snow.update(t)
+    return anim
+
+
+@shot(99, 1.0)
+def s99_thumbnail():
+    """Encuadre de la miniatura: la cara pegada al vidrio escarchado, a la derecha del cuadro."""
+    reset_scene()
+    o = interior(hand=False)
+    o["bulb_light"].data.energy = 6
+    o["glass_mat"].node_tree.nodes["frostamt"].inputs["From Min"].default_value = 0.7
+    root, face = creature_face("creature", scale=0.2, grin=1.15)
+    root.rotation_euler = (0.04, 0.0, math.pi / 2 + 0.12)
+    root.location = (-3.25, 0.42, 1.47)
+    light("SPOT", (-3.04, 0.55, 1.12), 11, (0.85, 0.95, 1.0), size=0.02, target=(-3.3, 0.42, 1.5), spot=70, name="facekey")
+
+    light("AREA", (-4.0, 0.9, 2.2), 30, (0.4, 0.6, 1.0), size=0.6, target=(-3.3, 0.4, 1.45), name="rim")
+    torch = light("SPOT", (-1.9, 0.0, 1.35), 120, (1.0, 0.93, 0.82), size=0.02, spot=34, blend=0.5, name="torch")
+    look_at(torch, (-3, 0.3, 1.42))
+    cam = camera(lens=42, loc=(-2.05, -0.12, 1.45), target=(-3.0, 0.14, 1.45), fstop=2.8, focus=1.25)
+
+    def anim(t):
+        pass
     return anim
 
 
