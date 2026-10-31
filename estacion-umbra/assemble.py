@@ -35,6 +35,8 @@ def run(cmd):
 def shot_clip(i):
     fps = SHOT_FPS.get(i, FPS)
     out = os.path.join(BUILD, f"clip{i:02d}.mp4")
+    if os.path.exists(out) and os.environ.get("UMBRA_REBUILD") != "1":
+        return out
     n = int(round(DUR[i] * fps))
     src = os.path.join(FRAMES, f"shot{i:02d}", "f_%04d.png")
     missing = [k for k in range(n) if not os.path.exists(os.path.join(FRAMES, f"shot{i:02d}", f"f_{k:04d}.png"))]
@@ -42,7 +44,7 @@ def shot_clip(i):
         raise SystemExit(f"toma {i}: faltan {len(missing)} cuadros (primero {missing[0]})")
     interp = ("minterpolate=fps=60:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:me=epzs:vsbmc=1:scd=none"
               if fps < 60 else "fps=60")
-    vf = f"{interp},{GRADE}"
+    vf = f"{interp},tpad=stop_mode=clone:stop_duration=0.5,{GRADE}"
     # los ultimos cuadros interpolados necesitan el cuadro final: se recorta a la duracion exacta
     run(["ffmpeg", "-v", "error", "-y", "-framerate", str(fps), "-start_number", "0", "-i", src,
          "-vf", vf, "-t", f"{DUR[i]}", "-r", "60", "-c:v", "libx264", "-preset", "medium", "-crf", "12",
