@@ -628,12 +628,12 @@ def sc_gps(c, t):
     # correccion de reloj
     if t > 43.3:
         kc = back((t - 43.44) / 0.6)
-        a = clamp(kc)
+        a = clamp(kc) * (1 - fin(t, 45.5, 0.3))
         y = 1300
         rrect(c, W / 2 - 390, y - 85, 780, 150, 30, P((30, 24, 8), a * 0.85))
         rrect(c, W / 2 - 390, y - 85, 780, 150, 30, P(GOLD, a, stroke=4))
         text(c, "+38 μs / día", W / 2, y + 22, int(76 * clamp(kc, 0, 1.12)), GOLD, a, "black", glow=10)
-        text(c, "corrección diaria de sus relojes", W / 2, y + 125, 36, MUTED, fin(t, 44.0, 0.5), "med")
+        text(c, "corrección diaria de sus relojes", W / 2, y + 125, 36, MUTED, fin(t, 44.0, 0.5) * (1 - fin(t, 45.5, 0.3)), "med")
     # error de posicion
     if t > 45.6:
         ke = fin(t, 45.7, 0.4)
@@ -1008,9 +1008,32 @@ CAP_Y = 1650
 CAP_SIZE = 64
 
 
+# Subtitulos SOLO en los momentos clave (frases que no repite el grafico en pantalla)
+KEY_MOMENTS = [
+    (0.0, 3.8),      # ¿Y si te dijera que viajar al futuro no es ciencia ficción?
+    (9.6, 12.7),     # Pero viajar al pasado... es otra historia.
+    (18.0, 20.6),    # el tiempo no corre igual para todos.
+    (46.7, 49.8),    # tu móvil se equivocaría en varios kilómetros diarios.
+    (57.7, 59.7),    # podrían haber pasado décadas.
+    (72.2, 75.6),    # Si viajas atrás e impides tu propio nacimiento...
+    (80.0, 82.5),    # la lógica del universo se rompe.
+    (95.7, 97.4),    # algo que nunca hemos encontrado
+    (111.6, 112.9),  # si fuera posible...
+    (128.9, 132.9),  # todos ya viajamos al futuro... a un segundo por segundo.
+]
+
+
+def moment_of(w):
+    for i, (a, b) in enumerate(KEY_MOMENTS):
+        if a <= w["start"] < b:
+            return i
+    return None
+
+
 def build_groups():
     words = json.load(open(os.path.join(AUD, "words.json")))["words"]
-    ws = [w for w in words if w["type"] == "word" and not w["text"].startswith("[")]
+    ws = [w for w in words if w["type"] == "word" and not w["text"].startswith("[")
+          and moment_of(w) is not None]
     groups = []
     cur = []
     for i, w in enumerate(ws):
@@ -1022,6 +1045,7 @@ def build_groups():
             or len(cur) >= 4
             or w["text"][-1] in ".,:?!…"
             or (nxt and nxt["start"] - w["end"] > 0.3)
+            or moment_of(nxt) != moment_of(w)
             or tw_of(txt + " " + nxt["text"].upper(), CAP_SIZE) > 900
         )
         if brk:
