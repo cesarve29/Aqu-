@@ -1241,24 +1241,26 @@ def render_chunk(args):
 def build_audio():
     out = os.path.join(HERE, "build", "mix.wav")
     voice = os.path.join(AUD, "voz_take1.mp3")
+    # Ganancias calibradas por sonoridad medida (EBU R128) de cada archivo:
+    # voz ~ -20 LUFS; los efectos quedan entre 9 y 16 LU por debajo de la voz.
     sfx = [  # (archivo, inicio s, volumen dB)
-        ("sfx_boom.mp3", 0.0, -6), ("sfx_clock.mp3", 0.2, -14), ("sfx_rewind.mp3", 9.55, -8),
-        ("sfx_boom.mp3", 13.5, -7), ("sfx_clock.mp3", 18.1, -16), ("sfx_whoosh.mp3", 29.5, -8),
-        ("sfx_whoosh.mp3", 40.7, -9), ("sfx_beeps.mp3", 41.3, -15), ("sfx_beeps.mp3", 43.4, -16),
-        ("sfx_whoosh.mp3", 49.9, -9), ("sfx_warp.mp3", 50.4, -8), ("sfx_riser.mp3", 62.3, -12),
-        ("sfx_rewind.mp3", 66.2, -5), ("sfx_boom.mp3", 66.65, -5), ("sfx_whoosh.mp3", 69.6, -9),
-        ("sfx_rewind.mp3", 72.4, -14), ("sfx_boom.mp3", 81.45, -6), ("sfx_whoosh.mp3", 82.3, -9),
-        ("sfx_warp.mp3", 84.9, -18), ("sfx_boom.mp3", 95.7, -10), ("sfx_whoosh.mp3", 99.2, -9),
-        ("sfx_riser.mp3", 109.0, -13), ("sfx_boom.mp3", 113.0, -9), ("sfx_whoosh.mp3", 115.3, -9),
-        ("sfx_whoosh.mp3", 116.8, -12), ("sfx_whoosh.mp3", 121.6, -12), ("sfx_whoosh.mp3", 127.0, -10),
-        ("sfx_clock.mp3", 127.5, -14), ("sfx_boom.mp3", 135.15, -9),
+        ("sfx_boom.mp3", 0.0, -19), ("sfx_clock.mp3", 0.2, -15), ("sfx_rewind.mp3", 9.55, -23),
+        ("sfx_boom.mp3", 13.5, -23), ("sfx_clock.mp3", 18.1, -17), ("sfx_whoosh.mp3", 29.5, -18),
+        ("sfx_whoosh.mp3", 40.7, -19), ("sfx_beeps.mp3", 41.3, -19), ("sfx_beeps.mp3", 43.4, -20),
+        ("sfx_whoosh.mp3", 49.9, -19), ("sfx_warp.mp3", 50.4, -23), ("sfx_riser.mp3", 62.3, -26),
+        ("sfx_rewind.mp3", 66.2, -22), ("sfx_boom.mp3", 66.65, -19), ("sfx_whoosh.mp3", 69.6, -19),
+        ("sfx_rewind.mp3", 72.4, -31), ("sfx_boom.mp3", 81.45, -20), ("sfx_whoosh.mp3", 82.3, -19),
+        ("sfx_warp.mp3", 84.9, -31), ("sfx_boom.mp3", 95.7, -23), ("sfx_whoosh.mp3", 99.2, -19),
+        ("sfx_riser.mp3", 109.0, -27), ("sfx_boom.mp3", 113.0, -22), ("sfx_whoosh.mp3", 115.3, -19),
+        ("sfx_whoosh.mp3", 116.8, -21), ("sfx_whoosh.mp3", 121.6, -21), ("sfx_whoosh.mp3", 127.0, -20),
+        ("sfx_clock.mp3", 127.5, -15), ("sfx_boom.mp3", 135.15, -22),
     ]
     inputs = ["-i", voice, "-stream_loop", "-1", "-i", os.path.join(AUD, "sfx_ambience.mp3")]
     for f, _, _ in sfx:
         inputs += ["-i", os.path.join(AUD, f)]
     fl = [f"[0:a]aresample=48000,pan=stereo|c0=c0|c1=c0,adelay=0|0,volume=0dB,"
           f"acompressor=threshold=-20dB:ratio=3:attack=5:release=120,apad=whole_dur={END}[v]",
-          f"[1:a]aresample=48000,pan=stereo|c0=c0|c1=c0,atrim=0:{END},volume=-19dB,"
+          f"[1:a]aresample=48000,pan=stereo|c0=c0|c1=c0,atrim=0:{END},volume=-26dB,"
           f"afade=t=in:d=1.5,afade=t=out:st={END - 3}:d=3[amb]"]
     labels = ["[v]", "[amb]"]
     for i, (f, st, db) in enumerate(sfx):
