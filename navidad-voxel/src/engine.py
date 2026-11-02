@@ -284,4 +284,8 @@ class Renderer:
             self.p.stdin.close()
         except Exception:
             pass
-        self.p.wait()
+        try:
+            self.p.wait(timeout=10)
+        except Exception:
+            self.p.kill()
+            self.p.wait()

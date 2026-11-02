@@ -1083,8 +1083,9 @@ int main(int argc, char **argv) {
             nbeams++;
         } else if (!strcmp(cmd, "PARTS")) {
             // binary block follows: n * 9 floats (x y z size r g b a type)
-            int n; sscanf(line + 6, "%d", &n);
-            if (n > capparts) { capparts = n; parts = realloc(parts, sizeof(Part) * capparts); }
+            int n = 0; sscanf(line + 6, "%d", &n);
+            if (n < 0 || n > 1000000) { fprintf(stderr, "bad PARTS %d\n", n); break; }
+            if (n > capparts) { capparts = n + 4096; parts = realloc(parts, sizeof(Part) * capparts); if (!parts) { fprintf(stderr, "oom\n"); break; } }
             float *buf = malloc(sizeof(float) * 9 * (n > 0 ? n : 1));
             if (n > 0 && fread(buf, sizeof(float) * 9, n, stdin) != (size_t)n) { free(buf); break; }
             for (int i = 0; i < n; i++) {
