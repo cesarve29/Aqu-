@@ -90,6 +90,8 @@ def humanoid(prefix, coat, pants, boots, mitt, hair, hat=None, hat_trim=None, sc
 
 
 def build_models():
+    _next[0] = 0
+    IDS.clear()
     # ---------------- Tilo
     humanoid("tilo", coat=(176, 112, 58), pants=(64, 72, 112), boots=(80, 52, 34), mitt=(60, 120, 70),
              hair=(110, 70, 40), hat=(52, 120, 76), hat_trim=(240, 240, 235), scarf=(200, 36, 40))
