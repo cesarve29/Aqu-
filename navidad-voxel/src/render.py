@@ -316,6 +316,12 @@ if __name__ == "__main__":
     elif a.mode == "events":
         extract_events()
     elif a.mode == "all":
+        import fcntl
+        lockf = open(os.path.join(BUILD, "render_all.lock"), "w")
+        try:
+            fcntl.flock(lockf, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            raise SystemExit("another render.py all is already running")
         for s in story.SCENES:
             render_scene(s[0], W=a.w or 1920, H=a.h or 1080)
         print("ALL DONE", flush=True)

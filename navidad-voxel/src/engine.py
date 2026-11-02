@@ -117,13 +117,15 @@ class VoxModel:
     def save(self, path):
         w, h, d = self.v.shape
         arr = np.ascontiguousarray(self.v.transpose(1, 2, 0))
-        with open(path, "wb") as f:
+        tmp = path + ".tmp%d" % os.getpid()
+        with open(tmp, "wb") as f:
             f.write(struct.pack("iii", w, h, d))
             f.write(struct.pack("fff", *self.pivot))
             f.write(struct.pack("i", len(self.pal)))
             for p in self.pal:
                 f.write(struct.pack("ffffff", p[0], p[1], p[2], p[3], p[4], 0.0))
             f.write(arr.tobytes())
+        os.replace(tmp, path)
 
 
 # ----------------------------------------------------------------- math helpers
