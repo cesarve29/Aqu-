@@ -236,24 +236,46 @@ def render_scene(name, W=1920, H=1080, crf=18, preset="faster"):
         path = os.path.join(cdir, "%s_%03d.mp4" % (name, k))
         if os.path.exists(path):
             continue
-        if sr is None:
-            sr = SceneRenderer(W, H)
+        for attempt in range(4):
+            try:
+                if sr is None:
+                    sr = SceneRenderer(W, H)
+                _render_chunk(sr, sc, name, k, c0, min(n, c0 + CHUNK), path, W, H, crf, preset)
+                break
+            except (RuntimeError, OSError) as e:
+                print("retry chunk", name, k, e, flush=True)
+                try:
+                    sr.close()
+                except Exception:
+                    pass
+                sr = None
+        # fresh renderer for every chunk keeps memory clean
+        if sr is not None:
+            sr.close()
+            sr = None
+
+
+def _render_chunk(sr, sc, name, k, c0, c1, path, W, H, crf, preset):
+    if True:
+        n = nframes(sc)
         tmp = path + ".part.mp4"
-        c1 = min(n, c0 + CHUNK)
         ff = subprocess.Popen(["ffmpeg", "-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", "%dx%d" % (W, H),
                                "-r", str(FPS), "-i", "-", "-c:v", "libx264", "-preset", preset, "-crf", str(crf),
                                "-pix_fmt", "yuv420p", "-threads", "2", tmp], stdin=subprocess.PIPE)
         t0 = time.time()
         state = {}
-        for f_ in range(c0, c1):
-            img = sr.frame(sc, f_ / FPS, state)
-            ff.stdin.write(img.tobytes())
+        try:
+            for f_ in range(c0, c1):
+                img = sr.frame(sc, f_ / FPS, state)
+                ff.stdin.write(img.tobytes())
+        except Exception:
+            ff.kill()
+            ff.wait()
+            raise
         ff.stdin.close()
         ff.wait()
         os.replace(tmp, path)
         print("%s chunk %d (%d-%d of %d) %.2fs/frame" % (name, k, c0, c1, n, (time.time() - t0) / (c1 - c0)), flush=True)
-    if sr is not None:
-        sr.close()
 
 
 def extract_events():
