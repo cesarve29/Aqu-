@@ -315,25 +315,57 @@ def tilo(ctx, pos, yaw, pose, scarf=True, lantern=True, lit=1.0, light=True, sca
     return pts
 
 
-def auto_clip(wd, pos, target):
-    """distance along the camera->target segment beyond which nothing blocks the target"""
+def _solid_at(v, p):
+    X, Y, Z = v.shape
+    xi, yi, zi = int(math.floor(p[0])), int(math.floor(p[1])), int(math.floor(p[2]))
+    return 0 <= xi < X and 0 <= yi < Y and 0 <= zi < Z and v[xi, yi, zi] != 0
+
+
+def auto_clip_old(wd, pos, target):
     p = np.array(pos, float); q = np.array(target, float)
     d = q - p
     L = float(np.linalg.norm(d))
     if L < 1e-3:
         return 0.0
-    v = wd.v
-    X, Y, Z = v.shape
     n = int(L / 0.2) + 1
     clip = 0.0
-    for i in range(n, -1, -1):  # from camera side towards target? walk from target back to camera
+    for i in range(n, -1, -1):
         s = L * i / n
-        x, y, z = p + d * (s / L)
-        xi, yi, zi = int(math.floor(x)), int(math.floor(y)), int(math.floor(z))
-        if 0 <= xi < X and 0 <= yi < Y and 0 <= zi < Z and v[xi, yi, zi]:
-            if s < L - 1.2:
-                clip = s + 0.8
-                break
+        if _solid_at(wd.v, p + d * (s / L)) and s < L - 1.2:
+            clip = s + 0.8
+            break
+    return min(clip, max(L - 1.0, 0.0))
+
+
+def auto_clip(wd, pos, target):
+    """Only clip occluders that sit close to the camera (camera inside a wall, a tree right in
+    front of the lens). Geometry around the target itself (e.g. the big tree the camera looks
+    at) is never clipped."""
+    p = np.array(pos, float); q = np.array(target, float)
+    d = q - p
+    L = float(np.linalg.norm(d))
+    if L < 1e-3:
+        return 0.0
+    near = min(10.0, 0.35 * L)
+    step = 0.2
+    n = int(L / step) + 1
+    clip = 0.0
+    i = 0
+    while i <= n:
+        s = L * i / n
+        if s > near:
+            break
+        if _solid_at(wd.v, p + d * (s / L)):
+            # end of this solid run
+            j = i
+            while j <= n and _solid_at(wd.v, p + d * (L * j / n / L)):
+                j += 1
+            s_end = L * j / n
+            if s_end > 0.6 * L:
+                break  # the run reaches the subject: do not cut into it
+            clip = s_end + 0.3
+            i = j
+        i += 1
     return min(clip, max(L - 1.0, 0.0))
 
 

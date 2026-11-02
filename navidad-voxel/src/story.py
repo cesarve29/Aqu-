@@ -226,7 +226,7 @@ def wind_stream(t, progress, n=900, swirl=0.0):
             sp = np.array(STAR_POS) + np.array((math.cos(ang) * rad, (i % 11 - 5) * 0.3, math.sin(ang) * rad))
             q = q * (1 - swirl) + sp * swirl
         out[k, :3] = q
-        out[k, 3] = 0.2
+        out[k, 3] = 0.2 * (1 - 0.65 * swirl)
         out[k, 4:7] = (0.6, 0.8, 1.1)
         out[k, 7] = 0.45 * min(1, (progress - u) * 6 + 0.2)
         out[k, 8] = 0
@@ -275,7 +275,7 @@ def sc_s03(ctx, dur):
         lookat_cam(ctx, vlerp((96, 30, 152), (96, 27, 146), k), (96, 24, 104), 44)
     elif i == 1:
         k = ease_io(u / L)
-        lookat_cam(ctx, vlerp((87.5, 23.0, 82.5), (86.8, 24.2, 83.6), k), (80.5, 24.2, 88.5), 42)
+        lookat_cam(ctx, vlerp((80.5, 23.6, 80.0), (80.5, 24.2, 81.8), k), (80.5, 24.4, 88.5), 44)
     elif i == 2:
         k = ease_io(u / L)
         lookat_cam(ctx, vlerp((96, 50.5, 121), (96, 52, 117), k), (96, 54.6, 104), 40)
@@ -298,7 +298,7 @@ def sc_s03(ctx, dur):
         if t < T_OUT + 1.5:
             fadew = 1.0 if t < T_OUT else 1 - (t - T_OUT) / 1.5
             ws = wind_stream(t, prog, swirl=sw)
-            ws[:, 7] *= fadew
+            ws[:, 7] *= fadew * (1 - 0.6 * sw)
             parts.append(ws)
     ctx.once("wind_cold", T_WIND, "cold_wind", dur=T_OUT - T_WIND + 2)
     ctx.once("ignite", T_IGN, "ignite_soft")
@@ -429,7 +429,7 @@ def sc_s05(ctx, dur):
     elif i == 3:
         fwd = np.array((math.sin(yaw), 0, math.cos(yaw)))
         right = np.array((math.cos(yaw), 0, -math.sin(yaw)))
-        cam = np.array(pos) + fwd * 2.5 + right * 3.0 + np.array((0, 2.0, 0))
+        cam = np.array(pos) + fwd * 2.5 + right * 3.0 + np.array((0, 3.0, 0))
         lookat_cam(ctx, cam, (pos[0], pos[1] + 1.0, pos[2]), 42)
         ctx.once("heart", 24.5, "heartbeat", dur=3.5)
     else:
@@ -726,7 +726,7 @@ def sc_s08(ctx, dur):
         lookat_cam(ctx, vlerp((60, 18, 98), (84, 18, 98), k), vlerp((66, 17, 80), (78, 17, 80), k), 46)
     elif i == 2:
         k = ease_io(u / L)
-        lookat_cam(ctx, vlerp((58, 21, 110), (61, 20, 107), k), (pos[0], 12.5, pos[2] - 3), 48)
+        lookat_cam(ctx, vlerp((86, 24, 100), (84, 23, 97), k), (pos[0], 12.5, pos[2] - 2), 48)
     else:
         k = ease_io(u / L)
         lookat_cam(ctx, vlerp((73.4, 14.6, 94.5), (74.2, 14.9, 90.5), k), vlerp((76.5, 15.5, 80), (77.2, 16.6, 78.5), k), 44)
