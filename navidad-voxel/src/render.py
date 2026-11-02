@@ -223,7 +223,7 @@ def still(name, t, W=1920, H=1080):
 CHUNK = 600  # frames per resumable chunk
 
 
-def render_scene(name, W=1920, H=1080, crf=18, preset="medium"):
+def render_scene(name, W=1920, H=1080, crf=18, preset="faster"):
     sc = scene_by_name(name)
     if os.path.exists(os.path.join(OUT, "scenes", "%s.mp4" % name)):
         return

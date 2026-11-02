@@ -3,3 +3,5 @@ out/
 *.o
 voxrt
 __pycache__/
+video/*.mp4
+!video/avance_titulo.mp4
