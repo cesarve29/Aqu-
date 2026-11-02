@@ -4,7 +4,7 @@ import numpy as np
 from engine import M, Frame, rot_x, rot_y, rot_z, I3, ease, ease_io, lerp, vlerp, smoothstep, catmull
 from models import IDS, humanoid_instances, golem_instances, walk_pose, idle_pose, Pose
 
-FPS = 30
+FPS = 60
 
 
 # ---------------------------------------------------------------- context

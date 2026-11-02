@@ -82,8 +82,10 @@ def draw_title(img, W, H):
     s = H / 1080
     f1 = ImageFont.truetype(FONT_TITLE, int(120 * s))
     f2 = ImageFont.truetype(FONT_BODY, int(48 * s))
+    f0 = ImageFont.truetype(FONT_BOLD, int(40 * s))
+    shadowed_text(img, (W / 2, H * 0.27), "LAS CRÓNICAS DE PINOALTO", f0, fill=(200, 225, 255), glow=(120, 170, 255, 120), shadow=int(5 * s) + 1)
     shadowed_text(img, (W / 2, H * 0.40), "Tilo y la Estrella del Alba", f1, glow=(255, 190, 90, 160), shadow=int(8 * s) + 1)
-    shadowed_text(img, (W / 2, H * 0.53), "Un cuento de Navidad", f2, fill=(230, 235, 255), shadow=int(5 * s) + 1)
+    shadowed_text(img, (W / 2, H * 0.53), "Capítulo 1 · Un cuento de Navidad", f2, fill=(230, 235, 255), shadow=int(5 * s) + 1)
 
 
 def draw_chapter(text):
@@ -95,7 +97,7 @@ def draw_chapter(text):
 
 
 CREDITS = [
-    (1.0, 7.0, ["Tilo y la Estrella del Alba", "Un cuento original de Navidad"]),
+    (1.0, 7.0, ["Fin del Capítulo 1", "Las Crónicas de Pinoalto · Tilo y la Estrella del Alba"]),
     (7.5, 13.5, ["Mundo voxel con ray tracing en tiempo de CPU", "Música y efectos de sonido sintetizados con código"]),
     (14.0, 21.0, ["¡Feliz Navidad!", "La luz que compartes nunca se apaga"]),
 ]
