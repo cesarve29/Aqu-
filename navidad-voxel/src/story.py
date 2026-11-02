@@ -904,16 +904,16 @@ def sc_s10(ctx, dur):
     f = ctx.f
     wd = ctx.wd
     apply_env(ctx, PEAK, plane_y=4.0, exposure=1.25, fade=scene_fade(t, dur, 0.9, 1.0))
-    path = Path([(88.5, 118.0), (88.5, 108.0), (88.5, 99.0), (88.5, 94.0)], speed=1.7, t0=0.0)
+    path = Path([(88.5, 116.0), (88.5, 108.0), (88.5, 100.0), (88.5, 94.0)], speed=1.7, t0=0.0)
     tt = min(t, 9.5) * path.length / 1.7 / 9.5
     p2, yaw, s, mv = path.state(tt)
     pos = (p2[0], ground_at(wd, p2[0], p2[1]), p2[1])
     ph = s / 0.62 * math.pi
     lean = 0.0
     if mv and t < 9.5:
-        steps(ctx, "tilo", ph, "snow")
+        steps(ctx, "tilo", ph, "wood" if pos[2] > 100.5 else "snow")
         pose = walk_pose(ph)
-        pose.body = (0.25, 0)
+        pose.body = (0.15, 0)
     else:
         pose = idle_pose(t)
         yaw = math.pi
@@ -943,7 +943,7 @@ def sc_s10(ctx, dur):
     ctx.once("rise", 8.5, "vortex_rise")
     ctx.once("roar1", 19.0, "roar")
     ctx.once("roar2", 21.8, "roar")
-    ctx.once("blizzard", 0.0, "blizzard", dur=dur, level=1.0)
+    ctx.once("blizzard", 0.0, "blizzard", dur=dur, level=0.45)
     ctx.once("warm", 34.5, "warm_swell")
     intensity = 0.35 + 0.65 * form
     parts = [vortex_snow(ctx.T, intensity, (pos[0], pos[1] + 6, pos[2] - 6))]
@@ -951,8 +951,8 @@ def sc_s10(ctx, dur):
         parts.append(sparkles(t, [lp], color=(3.0, 2.2, 0.8), size=0.05, n_per=40, spread=1.5 + raise_k, rise=0.6))
     i, u, L = shot(t, [0, 8.0, 17.0, 25.0, 34.0], dur)
     if i == 0:
-        cam = (pos[0] + 26.0, pos[1] + 9.0, pos[2] + 10.0)
-        lookat_cam(ctx, cam, (pos[0], pos[1] + 1.5, pos[2] - 2.0), 34)
+        cam = (pos[0] + 13.0, pos[1] + 9.0, pos[2] + 11.0)
+        lookat_cam(ctx, cam, (pos[0], pos[1] + 1.0, pos[2] - 2.5), 44)
     elif i == 1:
         k = ease_io(u / L)
         lookat_cam(ctx, vlerp((92.5, 65.0, 104.0), (91.5, 64.5, 101.0), k), (88.5, 68.0 + 2 * k, 84.0), 54)
@@ -1009,7 +1009,7 @@ def sc_s11(ctx, dur):
     ctx.once("light", T_LIGHT, "inner_light", dur=10)
     ctx.once("sigh", 17.5, "sigh")
     ctx.once("dis", T_DIS, "dissolve", dur=9)
-    ctx.once("bl", 0.0, "blizzard", dur=18, level=0.7)
+    ctx.once("bl", 0.0, "blizzard", dur=18, level=0.3)
     # glowing snow
     if t > T_DIS - 1:
         g = smoothstep(T_DIS - 1, T_DIS + 4, t)

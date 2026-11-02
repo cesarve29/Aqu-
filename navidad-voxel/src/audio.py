@@ -841,9 +841,9 @@ def build():
         elif nm == "wind":
             amb.add(T, sfx_wind(e["dur"], level=e.get("level", 0.5), seed=int(T)))
         elif nm == "cold_wind":
-            amb.add(T, sfx_wind(e["dur"], level=0.9, gust=1.0, whistle=1.0, seed=7))
+            amb.add(T, sfx_wind(e["dur"], level=0.6, gust=0.8, whistle=0.5, seed=7))
         elif nm == "blizzard":
-            amb.add(T, sfx_wind(e["dur"], level=1.3 * e.get("level", 1.0), gust=1.2, whistle=0.6, seed=int(T)))
+            amb.add(T, sfx_wind(e["dur"], level=1.3 * e.get("level", 1.0), gust=0.8, whistle=0.25, seed=int(T)))
         elif nm == "ignite_soft":
             sfx_wet.add(T, sfx_ignite(amp=0.35))
         elif nm == "star_out":
@@ -890,9 +890,9 @@ def build():
         elif nm == "warm_swell":
             sfx_wet.add(T, sfx_swell(0.5))
         elif nm == "vortex_rise":
-            sfx.add(T, sfx_vortex_rise(5.0))
+            sfx.add(T, sfx_vortex_rise(5.0), gain=0.6)
         elif nm == "roar":
-            sfx.add(T, sfx_roar(2.2))
+            sfx.add(T, sfx_roar(2.2), gain=0.6)
         elif nm == "inner_light":
             sfx_wet.add(T, sfx_swell(0.6, root=56))
             sfx_wet.add(T + 3, sfx_shimmer(6, amp=0.04))
@@ -930,7 +930,7 @@ def build():
     duck = 1.0 - 0.45 * np.clip(venv / 0.04, 0, 1)
     duck = movavg(duck, int(0.3 * SR))
     mus *= duck[:, None]
-    mix = vo * 1.0 + mus * 0.55 + fx * 1.0 + fxw * 1.0 + ambb * 0.9
+    mix = vo * 1.0 + mus * 0.55 + fx * 0.85 + fxw * 0.9 + ambb * 0.6
     n_total = int(total * SR)
     mix = mix[:n_total]
     # final fade

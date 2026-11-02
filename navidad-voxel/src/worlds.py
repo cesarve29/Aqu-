@@ -849,6 +849,35 @@ def build_peak():
         h = int(rng.integers(7, 12))
         if y + h + 2 < wd.Y:
             wd.spruce(x, z, h, base=y)
+    # stone viaduct with a plank staircase climbing the south face to the summit
+    bx = int(cx)            # deck centre column (x = 88)
+    z_top = cz + 12          # deck reaches plateau level here
+    lanterns = []
+    for z in range(z_top, Z - 2):
+        deck = 61 - int(round((z - z_top) * 1.15))
+        if deck < 6:
+            break
+        # carve everything above the walkway (no overhangs / shadows over Tilo)
+        for x in range(bx - 4, bx + 5):
+            for y in range(deck + 1, min(deck + 12, wd.Y)):
+                if v[x, y, z] != 0:
+                    v[x, y, z] = 0
+        # solid stone body under the deck, plank tread on top
+        for x in range(bx - 1, bx + 2):
+            v[x, 1:deck, z] = M["stone_brick"]
+            v[x, deck, z] = M["planks"]
+        # side walls of the viaduct and log railing posts
+        for x in (bx - 2, bx + 2):
+            v[x, 1:deck + 1, z] = M["stone_brick"]
+        if (z - z_top) % 3 == 0 and z > z_top + 3:
+            v[bx - 2, deck + 1, z] = M["log"]
+            v[bx - 2, deck + 2, z] = M["log"]
+        if (z - z_top) % 9 == 6:
+            v[bx - 2, deck + 3, z] = M["lantern"]
+            lanterns.append((bx - 0.7, deck + 3.5, z + 0.5))
+    for p in lanterns:
+        wd.lights.append((p, (2.4, 1.5, 0.6), 9.0, 1))
+    wd.markers["bridge_top"] = (bx + 0.5, 62.0, z_top + 0.5)
     wd.markers["summit"] = (cx + 0.5, 62.0, cz + 0.5)
     wd.markers["center"] = (cx, 62, cz)
     return wd
