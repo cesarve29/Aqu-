@@ -220,30 +220,40 @@ def still(name, t, W=1920, H=1080):
     sr.close()
 
 
-def render_scene(name, W=1920, H=1080, crf=17, preset="medium"):
+CHUNK = 600  # frames per resumable chunk
+
+
+def render_scene(name, W=1920, H=1080, crf=18, preset="medium"):
     sc = scene_by_name(name)
-    os.makedirs(os.path.join(OUT, "scenes"), exist_ok=True)
-    path = os.path.join(OUT, "scenes", "%s.mp4" % name)
-    tmp = path + ".part.mp4"
+    if os.path.exists(os.path.join(OUT, "scenes", "%s.mp4" % name)):
+        return
+    cdir = os.path.join(OUT, "chunks")
+    os.makedirs(cdir, exist_ok=True)
     n = nframes(sc)
-    sr = SceneRenderer(W, H)
-    ff = subprocess.Popen(["ffmpeg", "-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", "%dx%d" % (W, H),
-                           "-r", str(FPS), "-i", "-", "-c:v", "libx264", "-preset", preset, "-crf", str(crf),
-                           "-pix_fmt", "yuv420p", "-threads", "2", "-movflags", "+faststart", tmp], stdin=subprocess.PIPE)
-    t0 = time.time()
-    state = {}
-    for k in range(n):
-        t = k / FPS
-        img = sr.frame(sc, t, state)
-        ff.stdin.write(img.tobytes())
-        if k % 60 == 0:
-            el = time.time() - t0
-            print("%s frame %d/%d  %.2fs/frame" % (name, k, n, el / (k + 1)), flush=True)
-    ff.stdin.close()
-    ff.wait()
-    sr.close()
-    os.replace(tmp, path)
-    print("done", name, "%.1f min" % ((time.time() - t0) / 60), flush=True)
+    sr = None
+    for c0 in range(0, n, CHUNK):
+        k = c0 // CHUNK
+        path = os.path.join(cdir, "%s_%03d.mp4" % (name, k))
+        if os.path.exists(path):
+            continue
+        if sr is None:
+            sr = SceneRenderer(W, H)
+        tmp = path + ".part.mp4"
+        c1 = min(n, c0 + CHUNK)
+        ff = subprocess.Popen(["ffmpeg", "-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", "%dx%d" % (W, H),
+                               "-r", str(FPS), "-i", "-", "-c:v", "libx264", "-preset", preset, "-crf", str(crf),
+                               "-pix_fmt", "yuv420p", "-threads", "2", tmp], stdin=subprocess.PIPE)
+        t0 = time.time()
+        state = {}
+        for f_ in range(c0, c1):
+            img = sr.frame(sc, f_ / FPS, state)
+            ff.stdin.write(img.tobytes())
+        ff.stdin.close()
+        ff.wait()
+        os.replace(tmp, path)
+        print("%s chunk %d (%d-%d of %d) %.2fs/frame" % (name, k, c0, c1, n, (time.time() - t0) / (c1 - c0)), flush=True)
+    if sr is not None:
+        sr.close()
 
 
 def extract_events():
@@ -285,5 +295,5 @@ if __name__ == "__main__":
         extract_events()
     elif a.mode == "all":
         for s in story.SCENES:
-            if not os.path.exists(os.path.join(OUT, "scenes", s[0] + ".mp4")):
-                render_scene(s[0], W=a.w or 1920, H=a.h or 1080)
+            render_scene(s[0], W=a.w or 1920, H=a.h or 1080)
+        print("ALL DONE", flush=True)
