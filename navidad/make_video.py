@@ -575,15 +575,15 @@ def build_audio():
         ("sfx_whoosh.mp3", T["asi"] - 0.5, -13), ("sfx_riser.mp3", T["noche"] - 3.6, -16),
         ("sfx_bells.mp3", T["noche"] + 0.2, -11),
     ]
-    files = sorted({f for f, _, _ in ev} | {"sfx_winter.mp3"})
+    files = sorted({f for f, _, _ in ev} | {"sfx_xmas_loop.mp3"})
     LI = {f: loudness(os.path.join(AUD, f)) for f in files}
-    inputs = ["-i", voice, "-stream_loop", "-1", "-i", os.path.join(AUD, "sfx_winter.mp3")]
+    inputs = ["-i", voice, "-stream_loop", "-1", "-i", os.path.join(AUD, "sfx_xmas_loop.mp3")]
     for f, _, _ in ev:
         inputs += ["-i", os.path.join(AUD, f)]
     fl = [f"[0:a]aresample=48000,pan=stereo|c0=c0|c1=c0,"
           f"acompressor=threshold=-20dB:ratio=3:attack=5:release=120,apad=whole_dur={END}[v]",
           f"[1:a]aresample=48000,pan=stereo|c0=c0|c1=c0,atrim=0:{END},"
-          f"volume={vI - 16 - LI['sfx_winter.mp3']:.1f}dB,afade=t=in:d=1.0,afade=t=out:st={END - 3}:d=3[amb]"]
+          f"volume={vI - 21 - LI['sfx_xmas_loop.mp3']:.1f}dB,afade=t=in:d=1.0,afade=t=out:st={END - 3}:d=3[amb]"]
     labels = ["[v]", "[amb]"]
     for i, (f, st, rel) in enumerate(ev):
         ms = max(0, int(st * 1000))
