@@ -333,7 +333,7 @@ def sc_s04(ctx, dur):
         pose.head = (0.2 * math.sin(t * 0.8), 0.15)
         tilo(ctx, tp, yaw_to(tp, (96, 12, 60)), pose, lantern=False)
         k = ease_io(u / L)
-        lookat_cam(ctx, vlerp((80, 17.5, 125), (81.5, 16.8, 124), k), (93, 13.2, 118), 42)
+        lookat_cam(ctx, vlerp((89.5, 15.2, 127.5), (90.5, 14.9, 126.8), k), (95.5, 13.2, 119.5), 46)
         for n_ in range(6):
             ctx.once("murmur%d" % n_, 0.4 + n_ * 1.4, "murmur")
         f.particles(village_snow(ctx, (98, 20, 122), n=3000))
@@ -427,10 +427,8 @@ def sc_s05(ctx, dur):
         ctx.once("owl", 19.9, "owl")
         ctx.once("owl2", 22.0, "owl")
     elif i == 3:
-        fwd = np.array((math.sin(yaw), 0, math.cos(yaw)))
-        right = np.array((math.cos(yaw), 0, -math.sin(yaw)))
-        cam = np.array(pos) + fwd * 2.5 + right * 3.0 + np.array((0, 3.0, 0))
-        lookat_cam(ctx, cam, (pos[0], pos[1] + 1.0, pos[2]), 42)
+        cam = (pos[0] + 4.0, pos[1] + 5.5, pos[2] + 6.5)
+        lookat_cam(ctx, cam, (pos[0], pos[1] + 1.0, pos[2] - 2), 42)
         ctx.once("heart", 24.5, "heartbeat", dur=3.5)
     else:
         k = ease_io(u / L)
@@ -656,17 +654,17 @@ def sc_s07(ctx, dur):
     parts.append(sparkles(t, [(ax, ay + 6, az + 6)], color=(0.4, 0.7, 1.4), size=0.04, n_per=160, spread=14, rise=2.0, twinkle=1.5))
     i, u, L = shot(t, [0, 9.0, 19.8, 29.0, 41.0, 48.0], dur)
     if i == 0:
-        cam = (pos[0] + 3.0, pos[1] + 7.0, pos[2] + 9.0)
-        lookat_cam(ctx, cam, (pos[0], pos[1] + 1, pos[2] - 6), 46)
+        cam = (pos[0] + 0.5, pos[1] + 10.0, pos[2] + 5.5)
+        lookat_cam(ctx, cam, (pos[0], pos[1] + 0.5, pos[2] - 2), 50)
     elif i == 1:
         k = ease_io(u / L)
-        lookat_cam(ctx, vlerp((ax + 2, ay + 21, az + 38), (ax - 9, ay + 17, az + 27), k), vlerp((ax, ay + 2, az + 16), (ax, ay + 2, az + 4), k), 50)
+        lookat_cam(ctx, vlerp((ax + 3, ay + 13, az + 26), (ax - 5, ay + 12, az + 20), k), vlerp((ax, ay + 2, az + 12), (ax, ay + 2, az + 3), k), 52)
     elif i == 2:
         k = ease_io(u / L)
         lookat_cam(ctx, vlerp((ax + 6.5, ay + 5.0, az + 15.5), (ax + 4.5, ay + 4.2, az + 13.5), k), (ax, ay + 2.0, az + 2), 42)
     elif i == 3:
         k = ease_io(u / L)
-        lookat_cam(ctx, vlerp((ax + 2, ay + 26, az + 34), (ax - 2, ay + 30, az + 30), k), (ax, ay + 2, az + 2), 52)
+        lookat_cam(ctx, vlerp((ax + 1, ay + 21, az + 21), (ax - 2, ay + 23, az + 19), k), (ax, ay + 1, az + 1), 58)
     elif i == 4:
         k = ease_io(u / L)
         a = 0.9 + k * 0.9
@@ -719,8 +717,8 @@ def sc_s08(ctx, dur):
     parts = [sparkles(t, [(72, 13, 72)], color=(3.0, 1.0, 0.2), size=0.05, n_per=200, spread=30, rise=6.0, twinkle=3)]
     i, u, L = shot(t, [0, 9.0, 15.0, 22.0], dur)
     if i == 0:
-        cam = (pos[0] - 5.5, pos[1] + 7.5, pos[2] + 8.0)
-        lookat_cam(ctx, cam, (pos[0], pos[1] + 1, pos[2] - 6), 46)
+        cam = (pos[0] + 0.5, pos[1] + 9.5, pos[2] + 6.5)
+        lookat_cam(ctx, cam, (pos[0], pos[1] + 0.5, pos[2] - 3), 48)
     elif i == 1:
         k = ease_io(u / L)
         lookat_cam(ctx, vlerp((60, 18, 98), (84, 18, 98), k), vlerp((66, 17, 80), (78, 17, 80), k), 46)
@@ -842,7 +840,7 @@ def sc_s09(ctx, dur):
         lookat_cam(ctx, vlerp((73.2, 14.1, 90.2), (73.6, 14.3, 89.2), k), (77.4, 16.7, 78.6), 40)
     elif i == 3:
         k = ease_io(u / L)
-        lookat_cam(ctx, vlerp((66.5, 18.0, 88.0), (67.5, 17.5, 87.0), k), (76.0, 15.3, 80.0), 46)
+        lookat_cam(ctx, vlerp((65.0, 19.0, 91.0), (65.8, 18.6, 90.0), k), (75.5, 15.0, 81.0), 50)
     elif i == 4:
         k = ease_io(u / L)
         lookat_cam(ctx, vlerp((70.5, 15.0, 84.0), (70.8, 15.2, 83.2), k), (75.5, 15.4, 80.5), 44)
@@ -953,8 +951,8 @@ def sc_s10(ctx, dur):
         parts.append(sparkles(t, [lp], color=(3.0, 2.2, 0.8), size=0.05, n_per=40, spread=1.5 + raise_k, rise=0.6))
     i, u, L = shot(t, [0, 8.0, 17.0, 25.0, 34.0], dur)
     if i == 0:
-        cam = (pos[0] + 5.0, pos[1] + 7.0, pos[2] + 10.0)
-        lookat_cam(ctx, cam, (pos[0], pos[1] + 1.0, pos[2] - 4), 46)
+        cam = (pos[0] + 26.0, pos[1] + 9.0, pos[2] + 10.0)
+        lookat_cam(ctx, cam, (pos[0], pos[1] + 1.5, pos[2] - 2.0), 34)
     elif i == 1:
         k = ease_io(u / L)
         lookat_cam(ctx, vlerp((92.5, 65.0, 104.0), (91.5, 64.5, 101.0), k), (88.5, 68.0 + 2 * k, 84.0), 54)
@@ -966,7 +964,7 @@ def sc_s10(ctx, dur):
         lookat_cam(ctx, vlerp((87.2, 63.4, 91.2), (87.4, 63.3, 91.0), k), (pos[0], pos[1] + 1.2, pos[2]), 40, shake=0.5)
     else:
         k = ease_io(u / L)
-        lookat_cam(ctx, vlerp((96.5, 64.8, 99.5), (97.5, 65.3, 100.5), k), (88.5, 66.5, 86.5), 50)
+        lookat_cam(ctx, vlerp((99.0, 66.5, 104.0), (100.0, 67.0, 105.0), k), (88.5, 66.0, 86.5), 50)
     f.particles(cat(*parts))
     ctx.overlay.append(("chapter", "VII. El Invierno Hueco", smoothstep(1.5, 2.5, t) * (1 - smoothstep(6.5, 7.5, t))))
 
@@ -1033,10 +1031,10 @@ def sc_s11(ctx, dur):
         lookat_cam(ctx, vlerp((96, 66, 98), (94, 68, 95), k), (88.5, 69, 82), 48)
     elif i == 3:
         k = ease_io(u / L)
-        lookat_cam(ctx, vlerp((96, 70, 104), (104, 82, 122), k), vlerp((88.5, 68, 84), (88.5, 56, 82), k), 52)
+        lookat_cam(ctx, vlerp((96, 70, 104), (99, 73, 108), k), vlerp((88.5, 68, 84), (88.5, 64, 86), k), 54)
     else:
         k = ease_io(u / L)
-        lookat_cam(ctx, vlerp((104, 82, 122), (108, 86, 128), k), (86, 48, 80), 54)
+        lookat_cam(ctx, vlerp((99, 73, 108), (100, 75, 110), k), (88.5, 64, 86), 56)
     f.particles(cat(*parts))
 
 
@@ -1097,7 +1095,7 @@ def sc_s12(ctx, dur):
     lit = 1.0 if t < 25.0 else max(0.25, 1 - (t - 25) / 1.5)
     tl = tilo(ctx, pos, yaw, pose, lit=lit)
     # golem walking behind
-    gpath = Path([(96.5, 44.0), (96.5, 78.0)], speed=1.7, t0=3.0)
+    gpath = Path([(96.5, 20.0), (96.5, 78.0)], speed=2.4, t0=4.0)
     g2, gyaw, gs, gmv = gpath.state(t)
     gpos = (g2[0], ground_at(wd, g2[0], g2[1]), g2[1])
     gph = gs / 1.4 * math.pi
@@ -1136,7 +1134,7 @@ def sc_s12(ctx, dur):
     i, u, L = shot(t, [0, 8.4, 17.0, 25.0, 33.5, 45.0], dur)
     if i == 0:
         k = ease_io(u / L)
-        lookat_cam(ctx, vlerp((100, 22, 40), (100, 21, 52), k), (pos[0], pos[1] + 1, pos[2] + 6), 46)
+        lookat_cam(ctx, vlerp((96.5, 32, 34), (96.5, 31, 44), k), (pos[0], pos[1] + 1, pos[2] + 2), 46)
     elif i == 1:
         k = ease_io(u / L)
         lookat_cam(ctx, vlerp((112, 22, 90), (110, 23, 86), k), vlerp((96, 15, 72), (96, 15, 80), k), 50)
@@ -1144,7 +1142,7 @@ def sc_s12(ctx, dur):
         k = ease_io(u / L)
         a = -math.pi / 2 + 0.2 + k * 1.0
         R = 24 - 6 * k
-        lookat_cam(ctx, (VC[0] + math.cos(a) * R, pos[1] + 3, VC[2] + math.sin(a) * R), (pos[0], pos[1] + 0.8, pos[2]), 48)
+        lookat_cam(ctx, (VC[0] + math.cos(a) * R, max(pos[1] + 4, 18), VC[2] + math.sin(a) * R), (pos[0], pos[1] + 0.8, pos[2]), 48)
     elif i == 3:
         k = ease_io(u / L)
         lookat_cam(ctx, vlerp((99, 56, 95.5), (100.0, 56.5, 94.0), k), (96.2, 54.4, 103.0), 46)
@@ -1153,7 +1151,7 @@ def sc_s12(ctx, dur):
         lookat_cam(ctx, vlerp((96, 60, 128), (96, 86, 186), k), vlerp((96, 52, 104), (96, 24, 92), k), 52)
     else:
         k = ease_io(u / L)
-        lookat_cam(ctx, vlerp((96, 17, 138), (96, 18, 134), k), (96, 20, 110), 46)
+        lookat_cam(ctx, vlerp((96, 30, 150), (96, 32, 146), k), (96, 26, 104), 46)
     parts.append(village_snow(ctx, (f.cam[0][0], f.cam[0][1] - 10, f.cam[0][2] - 25), n=2500))
     f.particles(cat(*parts))
     ctx.overlay.append(("chapter", "VIII. La Estrella del Alba", smoothstep(1.0, 2.0, t) * (1 - smoothstep(6.0, 7.0, t))))
@@ -1241,7 +1239,7 @@ def sc_s13(ctx, dur):
         lookat_cam(ctx, vlerp((60, 32, 140), (132, 30, 136), k), vlerp((80, 20, 108), (112, 20, 108), k), 46)
     elif i == 3:
         k = ease_io(u / L)
-        lookat_cam(ctx, vlerp((tp[0] + 2.0, 13.4, tp[2] + 4.2), (tp[0] + 1.6, 13.0, tp[2] + 3.4), k), vlerp((tp[0], 14, tp[2] - 3), (96, 40, 104), k), 48)
+        lookat_cam(ctx, vlerp((tp[0] - 1.0, 14.6, tp[2] + 5.5), (96.0, 26.0, 128.0), k), vlerp((tp[0], 13.4, tp[2]), (96, 34, 104), k), 48)
     else:
         k = ease_io(u / L)
         lookat_cam(ctx, vlerp((96, 30, 140), (96, 52, 132), k), vlerp((96, 40, 104), (96, 56, 100), k), 52)

@@ -549,6 +549,17 @@ def build_forest():
             wd.set(x + i, gy, z, "log")
             if rng.random() < 0.6:
                 wd.set(x + i, gy + 1, z, "snow")
+    # keep the trail clear: remove rocks / fallen logs / snow lumps standing on it
+    clear_ids = {M["stone"], M["moss_stone"], M["log"], M["snow"]}
+    for (px, pz) in trail:
+        for ox_ in range(-3, 4):
+            for oz_ in range(-3, 4):
+                x, z = int(px) + ox_, int(pz) + oz_
+                if 0 <= x < X and 0 <= z < Z:
+                    h0 = int(hm[x, z])
+                    for y in range(h0, min(h0 + 6, wd.Y)):
+                        if wd.v[x, y, z] in clear_ids:
+                            wd.v[x, y, z] = 0
     # owl perch tree near lake (north side)
     ox, oz = lx + 6, lz - 24
     gy = wd.ground_y(ox, oz)
