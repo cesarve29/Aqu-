@@ -757,6 +757,14 @@ def sfx_beam_hit(idx):
     return x
 
 
+def movavg(x, w):
+    c = np.cumsum(np.concatenate([[0.0], x]))
+    h = w // 2
+    idx = np.arange(len(x))
+    lo = np.clip(idx - h, 0, len(x)); hi = np.clip(idx + h, 0, len(x))
+    return (c[hi] - c[lo]) / np.maximum(hi - lo, 1)
+
+
 # ===================================================================== assembly
 def build():
     meta = json.load(open(os.path.join(BUILD, "timeline.json")))
@@ -918,9 +926,9 @@ def build():
     # ducking music under voice
     venv = np.abs(vo[:, 0]) + np.abs(vo[:, 1])
     win = int(0.25 * SR)
-    venv = np.convolve(venv, np.ones(win) / win, mode="same")
+    venv = movavg(venv, win)
     duck = 1.0 - 0.45 * np.clip(venv / 0.04, 0, 1)
-    duck = np.convolve(duck, np.ones(int(0.3 * SR)) / int(0.3 * SR), mode="same")
+    duck = movavg(duck, int(0.3 * SR))
     mus *= duck[:, None]
     mix = vo * 1.0 + mus * 0.55 + fx * 1.0 + fxw * 1.0 + ambb * 0.9
     n_total = int(total * SR)
