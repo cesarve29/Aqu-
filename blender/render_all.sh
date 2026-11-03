@@ -36,7 +36,7 @@ for shot in 1 2 3 4 5; do
     [ -f "$out" ] && continue
     tmp=frames/s${shot}
     echo "[$(date +%H:%M:%S)] plano $shot fotogramas $a-$b"
-    python3 film.py --shot $shot --frames $a-$b --outdir $tmp --samples $SAMPLES --res $RES 2>&1 | grep -E "RENDERED|Error|Traceback"
+    python3 film.py --shot $shot --frames $a-$b --outdir $tmp --samples $SAMPLES --res $RES 2>&1 | grep --line-buffered -E "RENDERED|Error|Traceback"
     cnt=$(ls $tmp/*.png 2>/dev/null | awk -F/ -v a=$a -v b=$b '{f=$NF+0} f>=a && f<=b' | wc -l)
     if [ "$cnt" -ne $((b-a+1)) ]; then echo "faltan fotogramas en $shot $a-$b"; exit 1; fi
     ffmpeg -y -loglevel error -framerate 24 -start_number $a -i $tmp/%04d.png \
