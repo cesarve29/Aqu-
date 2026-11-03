@@ -14,6 +14,8 @@ declare -A LEN=([1]=240 [2]=288 [3]=312 [4]=360 [5]=240)
 python3 -c "import bpy" 2>/dev/null || pip install -q bpy==5.2.3
 ldconfig -p | grep -q libEGL.so.1 || { apt-get update -q >/dev/null; apt-get install -y -q libegl1 libegl-mesa0 libgl1-mesa-dri libgles2 >/dev/null; }
 
+./fetch_assets.sh
+
 push() {
   for d in 0 2 4 8 16; do
     sleep $d

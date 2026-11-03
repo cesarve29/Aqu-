@@ -14,6 +14,7 @@ Planos (24 fps):
 """
 import bpy, bmesh, math, random, sys, os, argparse
 from mathutils import Vector, Matrix
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 FPS = 24
 RES_X, RES_Y = 1920, 804          # 2.39:1, se rellena a 1080 en post
@@ -287,34 +288,13 @@ def emblem(name, radius, mat, bevel, parent=None, loc=(0, 0, 0), rot=(0, 0, 0)):
 
 # ------------------------------------------------------------------ personaje
 import numpy as np
+from mathutils import Matrix
+import mhload
 
-COAT_PROF = [(0.05, 0.34, 0.29), (0.35, 0.30, 0.24), (0.62, 0.255, 0.185), (0.85, 0.225, 0.155),
-             (1.0, 0.215, 0.145), (1.12, 0.228, 0.148), (1.25, 0.245, 0.153), (1.36, 0.27, 0.16),
-             (1.44, 0.272, 0.157), (1.50, 0.235, 0.14), (1.54, 0.17, 0.12), (1.575, 0.105, 0.098),
-             (1.70, 0.094, 0.092)]
-SLIT_TOP = 0.62
-
-
-def coat_radii(z):
-    p = COAT_PROF
-    if z <= p[0][0]:
-        return p[0][1], p[0][2]
-    for (z0, a0, b0), (z1, a1, b1) in zip(p[:-1], p[1:]):
-        if z <= z1:
-            t = smooth((z - z0) / (z1 - z0))
-            return a0 + (a1 - a0) * t, b0 + (b1 - b0) * t
-    return p[-1][1], p[-1][2]
-
-
-def coat_xyz(z, a, inflate=0.0, folds=True):
-    rx, ry = coat_radii(z)
-    f = 1 - abs(z - 1.41) / 0.14
-    ex = 1 - 0.55 * smooth(f) if f > 0 else 1.0
-    if folds:
-        inflate += 0.009 * math.sin(7 * a + z * 2.5) * max(0.0, 1 - z / 1.15) \
-                   + 0.004 * math.sin(13 * a - z * 4) * max(0.0, 1 - z / 0.9)
-    c, s_ = math.cos(a), math.sin(a)
-    return ((rx + inflate) * math.copysign(abs(c) ** ex, c), (ry + inflate) * s_, z)
+SCALE = 1.08
+TORSO = ('spine', 'pelvis', 'upperleg', 'lowerleg', 'root', 'breast', 'clavicle', 'neck01', 'shoulder01')
+ARMS = ('upperarm', 'lowerarm', 'shoulder01')
+HANDS = ('finger', 'metacarpal', 'wrist')
 
 
 def fcurves_of(obj):
@@ -356,14 +336,12 @@ def hair_wind_group(strength, gust, speed):
     pw = N.new('ShaderNodeMath'); pw.operation = 'POWER'; pw.inputs[1].default_value = 1.6
     k = N.new('ShaderNodeMath'); k.operation = 'MULTIPLY'; k.inputs[1].default_value = strength
     sc = N.new('ShaderNodeVectorMath'); sc.operation = 'SCALE'
-    # rafaga direccional pulsante
     sn = N.new('ShaderNodeMath'); sn.operation = 'SINE'
     sn2 = N.new('ShaderNodeMath'); sn2.operation = 'MULTIPLY_ADD'
     sn2.inputs[1].default_value = 0.35; sn2.inputs[2].default_value = 0.65
-    gv = N.new('ShaderNodeVectorMath'); gv.operation = 'SCALE'
-    gv.inputs[0].default_value = gust
     gk = N.new('ShaderNodeMath'); gk.operation = 'MULTIPLY'
     gs = N.new('ShaderNodeVectorMath'); gs.operation = 'SCALE'
+    gs.inputs[0].default_value = gust
     add = N.new('ShaderNodeVectorMath'); add.operation = 'ADD'
     setp = N.new('GeometryNodeSetPosition')
     L(tm.outputs['Seconds'], sp.inputs[0]); L(sp.outputs[0], nz.inputs['W'])
@@ -373,43 +351,150 @@ def hair_wind_group(strength, gust, speed):
     L(cen.outputs[0], sc.inputs[0]); L(k.outputs[0], sc.inputs['Scale'])
     L(sp.outputs[0], sn.inputs[0]); L(sn.outputs[0], sn2.inputs[0])
     L(sn2.outputs[0], gk.inputs[0]); L(pw.outputs[0], gk.inputs[1])
-    L(gv.outputs[0], gs.inputs[0]); L(gk.outputs[0], gs.inputs['Scale'])
-    gv.inputs['Scale'].default_value = 1.0
+    L(gk.outputs[0], gs.inputs['Scale'])
     L(sc.outputs[0], add.inputs[0]); L(gs.outputs[0], add.inputs[1])
     L(gi.outputs[0], setp.inputs['Geometry']); L(add.outputs[0], setp.inputs['Offset'])
     L(setp.outputs[0], go.inputs[0])
     return ng
 
 
+class Profile:
+    """Secciones del torso medidas sobre el cuerpo real (x max, y min/max por altura)."""
+
+    def __init__(self, co, mask, z0, z1, step=0.03):
+        zs, rx, y0, y1 = [], [], [], []
+        for z in np.arange(z0, z1 + 1e-6, step):
+            m = mask & (np.abs(co[:, 2] - z) < step * 0.75)
+            if m.sum() < 4:
+                continue
+            zs.append(z); rx.append(np.abs(co[m, 0]).max())
+            y0.append(co[m, 1].min()); y1.append(co[m, 1].max())
+        k = np.ones(3) / 3
+        sm = lambda a: np.convolve(np.pad(a, 1, mode='edge'), k, mode='valid')
+        self.z = np.array(zs); self.rx = sm(np.array(rx))
+        self.y0 = sm(np.array(y0)); self.y1 = sm(np.array(y1))
+
+    def at(self, z):
+        rx = np.interp(z, self.z, self.rx); y0 = np.interp(z, self.z, self.y0)
+        y1 = np.interp(z, self.z, self.y1)
+        return rx, (y1 - y0) / 2, (y0 + y1) / 2
+
+
 class Figure:
-    """Figura original: abrigo largo con faldones abiertos, esclavina, cuello alto,
-    ribetes de luz, cinturon, bufanda carmesi, pelo blanco de hebras reales.
-    Mira hacia +Y (la camara suele estar detras, en -Y)."""
+    """Personaje original sobre cuerpo MakeHuman (CC0) con esqueleto:
+    abrigo largo a medida con faldones abiertos, esclavina, cuello alto,
+    ribetes de luz, cinturon, guantes, botas, bufanda carmesi y pelo blanco
+    de hebras reales.  Mira hacia +Y."""
 
     def __init__(self, loc=(0, 0, 0), hood_up=True, right_arm_up=False, seed=7,
-                 hair_wind=0.035, hair_gust=(0.02, -0.01, 0.0), scarf_lift=False):
+                 hair_wind=0.03, hair_gust=(0.015, -0.01, 0.0), scarf_lift=False):
         random.seed(seed); np.random.seed(seed)
-        self.root = empty('FigRoot', loc)
+        self.root = empty('FigRoot', (0, 0, 0))
         self.wind = empty('Wind', (0, 0, 0))
         self._materials()
-        self.head_piv = empty('HeadPiv', (0, 0, 1.66)); self.head_piv.parent = self.root
+        h = self.h = mhload.Human()
+        h.arm.scale = (SCALE,) * 3
+        h.arm.parent = self.root
+        self.arm = h.arm
+        self.arm_rest()
+        if right_arm_up:
+            self.arm_up()
+        self._measure()
+        self._body_materials()
         self._coat()
         self._capelet()
         self._collar()
         self._belt()
-        self._head()
-        self._arms(right_arm_up)
+        self._sleeves()
+        self._boots()
+        self._face()
         self._hair(hair_wind, hair_gust)
         self._hood(hood_up)
-        self._scarf(scarf_lift)
-        ry = coat_radii(1.31)[1] + 0.03
-        emblem('BackEmblem', 0.11, self.glow_mat, 0.003, parent=self.root,
-               loc=(0, -ry, 1.31), rot=(math.radians(90), 0, math.radians(180)))
+        if scarf_lift is None:
+            self._scarf(False)
+        x, ry, cy = self.prof.at(self.z_cape_mid)
+        emblem('BackEmblem', 0.1, self.glow_mat, 0.003, parent=None,
+               loc=(0, cy - ry - self.cape_off(self.z_cape_mid) - 0.006, self.z_cape_mid),
+               rot=(math.radians(90), 0, math.radians(180)))
+        self.root.location = loc
+
+    # ---- poses
+    def arm_rest(self, frame=None):
+        self.h.pose('upperarm01.L', (-44, 0, 6), frame); self.h.pose('upperarm01.R', (-44, 0, -6), frame)
+        self.h.pose('lowerarm01.L', (0, 0, 0), frame); self.h.pose('lowerarm01.R', (0, 0, 0), frame)
+
+    def arm_up(self, frame=None):
+        self.h.pose('upperarm01.R', (55, 0, 62), frame)
+        self.h.pose('lowerarm01.R', (0, 0, -10), frame)
+
+    def head(self, rot, frame=None):
+        self.h.pose('head', rot, frame)
+
+    def parent_bone(self, obj, bone):
+        bpy.context.view_layer.update()
+        arm = self.arm; pb = arm.pose.bones[bone]
+        M = arm.matrix_world @ pb.matrix @ Matrix.Translation((0, pb.bone.length, 0))
+        mw = obj.matrix_world.copy()
+        obj.parent = arm; obj.parent_type = 'BONE'; obj.parent_bone = bone
+        obj.matrix_parent_inverse = M.inverted()
+        obj.matrix_basis = mw
+
+    # ---- medicion del cuerpo posado
+    def _measure(self):
+        bpy.context.view_layer.update()
+        dg = bpy.context.evaluated_depsgraph_get()
+        ev = self.h.body.evaluated_get(dg)
+        me = ev.to_mesh()
+        mw = self.h.body.matrix_world
+        co = np.array([tuple(mw @ v.co) for v in me.vertices])
+        nm = np.array([tuple((mw.to_3x3() @ v.normal).normalized()) for v in me.vertices])
+        ev.to_mesh_clear()
+        names = {g.index: g.name for g in self.h.body.vertex_groups}
+        dom = []
+        for v in self.h.body.data.vertices:
+            dom.append(names[max(v.groups, key=lambda g: g.weight).group] if v.groups else '')
+        self.co, self.nm, self.dom = co, nm, dom
+        torso = np.array([d.startswith(TORSO) for d in dom])
+        self.z_neck = self.arm.matrix_world @ self.arm.pose.bones['neck01'].head
+        self.z_neck = self.z_neck.z
+        self.z_shoulder = (self.arm.matrix_world @ self.arm.pose.bones['upperarm01.L'].head).z
+        self.z_waist = (self.arm.matrix_world @ self.arm.pose.bones['spine03'].head).z
+        self.prof = Profile(co, torso, 0.15, self.z_neck + 0.02)
+        hd = np.array([d == 'head' for d in dom])
+        self.head_c = Vector(((co[hd, 0].min() + co[hd, 0].max()) / 2,
+                              (co[hd, 1].min() + co[hd, 1].max()) / 2 - 0.01,
+                              co[hd, 2].min() * 0.35 + co[hd, 2].max() * 0.65))
+        self.head_top = co[hd, 2].max()
+        self.z_hem = 0.3
+        self.z_cape_top = self.z_shoulder + 0.07
+        self.z_cape_bot = self.z_shoulder - 0.27
+        self.z_cape_mid = self.z_shoulder - 0.13
+        self.slit_top = 0.72
+
+    def cxyz(self, z, a, inflate=0.0, folds=True, ease=None):
+        """Punto de la superficie del abrigo a la altura z y angulo a."""
+        zw = self.z_waist
+        rx, ry, cy = self.prof.at(min(max(z, self.prof.z[0]), self.prof.z[-1]))
+        e = 0.03 if ease is None else ease
+        if z < zw:   # falda que se abre hacia abajo
+            rxw, ryw, cyw = self.prof.at(zw)
+            k = (zw - z)
+            rx = max(rx + e, rxw + e + k * 0.2); ry = max(ry + e, ryw + e + k * 0.15)
+            cy = cyw * (1 - min(1, k * 2)) + cy * min(1, k * 2)
+        else:
+            rx += e; ry += e
+        f = 1 - abs(z - (self.z_shoulder - 0.03)) / 0.12
+        ex = 1 - 0.5 * smooth(f) if f > 0 else 1.0
+        if folds:
+            inflate += 0.01 * math.sin(7 * a + z * 2.5) * max(0.0, (zw - z) / zw) \
+                       + 0.004 * math.sin(13 * a - z * 4) * max(0.0, (0.9 - z) / 0.9)
+        c, s_ = math.cos(a), math.sin(a)
+        return ((rx + inflate) * math.copysign(abs(c) ** ex, c), cy + (ry + inflate) * s_, z)
 
     # ---- materiales
     def _materials(self):
         def fabric(name, col, sheen_tint, bump_s=0.3, rough=0.82):
-            m, nt, p = mat_principled(name, col, rough=rough, sheen=0.55)
+            m, nt, p = mat_principled(name, col, rough=rough, sheen=0.5)
             p.inputs['Sheen Tint'].default_value = (*sheen_tint, 1)
             tc = nt.nodes.new('ShaderNodeTexCoord')
             nz = nt.nodes.new('ShaderNodeTexNoise'); nz.inputs['Scale'].default_value = 11
@@ -428,48 +513,60 @@ class Figure:
             nt.links.new(a1.outputs[0], a2.inputs[0]); nt.links.new(nz.outputs['Fac'], a2.inputs[1])
             nt.links.new(a2.outputs[0], b.inputs['Height'])
             nt.links.new(b.outputs['Normal'], p.inputs['Normal'])
-            # variacion sutil de color
             mr = nt.nodes.new('ShaderNodeMapRange')
-            mr.inputs['To Min'].default_value = 0.7; mr.inputs['To Max'].default_value = 1.25
+            mr.inputs['To Min'].default_value = 0.75; mr.inputs['To Max'].default_value = 1.2
             mix = nt.nodes.new('ShaderNodeVectorMath'); mix.operation = 'SCALE'
             mix.inputs[0].default_value = col
             nt.links.new(nz.outputs['Fac'], mr.inputs['Value'])
             nt.links.new(mr.outputs['Result'], mix.inputs['Scale'])
             nt.links.new(mix.outputs[0], p.inputs['Base Color'])
             return m
-        self.coat_mat = fabric('Coat', (0.016, 0.018, 0.028), (0.6, 0.75, 1.0))
-        self.cape_mat = fabric('Cape', (0.024, 0.024, 0.034), (0.75, 0.8, 1.0), bump_s=0.45)
-        self.scarf_mat = fabric('Scarf', (0.32, 0.012, 0.03), (1.0, 0.45, 0.5), rough=0.7)
-        self.leather_mat, _, _ = mat_principled('Leather', (0.025, 0.018, 0.015), rough=0.32, coat=0.6)
+        self.coat_mat = fabric('Coat', (0.018, 0.02, 0.03), (0.55, 0.7, 1.0))
+        self.cape_mat = fabric('Cape', (0.028, 0.028, 0.038), (0.7, 0.75, 1.0), bump_s=0.4)
+        self.pants_mat = fabric('Pants', (0.012, 0.012, 0.016), (0.5, 0.5, 0.6))
+        self.scarf_mat = fabric('Scarf', (0.3, 0.012, 0.03), (1.0, 0.45, 0.5), rough=0.7)
+        self.leather_mat, _, _ = mat_principled('Leather', (0.022, 0.017, 0.015), rough=0.33, coat=0.6)
         self.metal_mat, _, _ = mat_principled('Metal', (0.75, 0.75, 0.8), rough=0.22, metal=1.0)
-        self.skin_mat, _, _ = mat_principled('Skin', (0.86, 0.68, 0.6), rough=0.48, sss=0.3)
         self.glow_mat = mat_emit('Piping', (0.15, 0.85, 1.0), 5.0)
-        # pelo: raiz gris azulada -> puntas blancas, brillo
-        m, nt, p = mat_principled('Hair', (0.92, 0.92, 0.97), rough=0.3, sheen=0.9, coat=0.4)
+        m, nt, p = mat_principled('Hair', (0.92, 0.92, 0.97), rough=0.28, sheen=0.4, coat=0.5)
         hi = nt.nodes.new('ShaderNodeHairInfo')
         rp = nt.nodes.new('ShaderNodeValToRGB')
-        rp.color_ramp.elements[0].color = (0.42, 0.44, 0.55, 1)
-        rp.color_ramp.elements[1].position = 0.35
-        rp.color_ramp.elements[1].color = (0.95, 0.95, 1.0, 1)
+        rp.color_ramp.elements[0].color = (0.55, 0.56, 0.66, 1)
+        rp.color_ramp.elements[1].position = 0.3
+        rp.color_ramp.elements[1].color = (0.97, 0.97, 1.0, 1)
         nt.links.new(hi.outputs['Intercept'], rp.inputs['Fac'])
         nt.links.new(rp.outputs['Color'], p.inputs['Base Color'])
         self.hair_mat = m
+        self.cap_mat, _, _ = mat_principled('HairCap', (0.7, 0.71, 0.8), rough=0.5, sheen=0.5)
+
+    def _body_materials(self):
+        me = self.h.body.data
+        for m in (self.leather_mat, self.pants_mat, self.leather_mat):
+            me.materials.append(m)
+        names = {g.index: g.name for g in self.h.body.vertex_groups}
+        vdom = {}
+        for v in me.vertices:
+            vdom[v.index] = names[max(v.groups, key=lambda g: g.weight).group] if v.groups else ''
+        for p in me.polygons:
+            ds = [vdom[i] for i in p.vertices]
+            if any(d.startswith(HANDS) for d in ds):
+                p.material_index = 1
+            elif any(d.startswith(('foot', 'toe', 'lowerleg02')) for d in ds):
+                p.material_index = 3
+            elif all(d.startswith(('upperleg', 'lowerleg', 'pelvis', 'spine0', 'root', 'breast',
+                                   'clavicle', 'upperarm', 'lowerarm', 'shoulder')) for d in ds):
+                p.material_index = 2
 
     # ---- piezas de ropa
     def _strip(self, name, rows, seg, a0, a1, xyz, closed=False, split_fn=None, mat=None,
-               thick=0.012, weight_fn=None, parent=None):
+               thick=0.012, weight_fn=None):
         bm = bmesh.new()
         rings = []
         n = seg if closed else seg + 1
         for z in rows:
-            ring = []
-            for i in range(n):
-                ring.append(bm.verts.new(xyz(z, a0 + (a1 - a0) * i / seg, i)))
+            ring = [bm.verts.new(xyz(z, a0 + (a1 - a0) * i / seg, i)) for i in range(n)]
             if closed:
-                if split_fn and split_fn(z):
-                    ring.append(bm.verts.new(xyz(z, a1, seg)))
-                else:
-                    ring.append(ring[0])
+                ring.append(bm.verts.new(xyz(z, a1, seg)) if split_fn and split_fn(z) else ring[0])
             rings.append(ring)
         for r0, r1 in zip(rings[:-1], rings[1:]):
             for i in range(seg):
@@ -477,16 +574,17 @@ class Figure:
         o = mesh_obj(name, bm)
         for p in o.data.polygons:
             p.use_smooth = True
-        o.parent = parent or self.root
+        o.parent = self.root
         o.data.materials.append(mat or self.coat_mat)
         if weight_fn:
             vg = o.vertex_groups.new(name='w')
             for v in o.data.vertices:
                 vg.add([v.index], weight_fn(v.co), 'REPLACE')
-        sol = o.modifiers.new('sol', 'SOLIDIFY'); sol.thickness = thick
+        if thick:
+            o.modifiers.new('sol', 'SOLIDIFY').thickness = thick
         return o, rings
 
-    def _wind_mods(self, o, big, small, scale_big=0.35, scale_small=0.1):
+    def _wind_mods(self, o, big, small, scale_big=0.35, scale_small=0.1, sub=True):
         t1 = bpy.data.textures.new(o.name + 'W1', 'CLOUDS'); t1.noise_scale = scale_big
         t1.cloud_type = 'COLOR'
         d = o.modifiers.new('wind', 'DISPLACE'); d.texture = t1; d.direction = 'RGB_TO_XYZ'
@@ -496,68 +594,124 @@ class Figure:
         d2 = o.modifiers.new('flutter', 'DISPLACE'); d2.texture = t2
         d2.texture_coords = 'OBJECT'; d2.texture_coords_object = self.wind
         d2.strength = small; d2.vertex_group = 'w'
-        sub = o.modifiers.new('sub', 'SUBSURF'); sub.levels = 1; sub.render_levels = 2
+        if sub:
+            s = o.modifiers.new('sub', 'SUBSURF'); s.levels = 1; s.render_levels = 2
+        return t1, t2
+
+    def hem_w(self, z):
+        return smooth((self.z_waist - 0.05 - z) / 0.7) ** 1.2
 
     def _coat(self):
-        seg = 56
-        rows = list(np.linspace(0.05, 1.70, 46))
-        back = -math.pi / 2
-
-        def xyz(z, a, i):
-            eps = 0.06 * max(0.0, (SLIT_TOP - z) / SLIT_TOP) ** 0.8
-            if z < SLIT_TOP:
-                if i == 0:
-                    a += eps
+        seg = 64
+        top = self.z_neck + 0.015
+        rows = list(np.linspace(self.z_hem, top, 52))
+        front = math.pi / 2
+        st = self.slit_top
+        fo = self.z_waist - 0.06        # abertura delantera (abrigo abierto abajo)
+        bm = bmesh.new()
+        rings = []
+        half = seg // 2
+        for z in rows:
+            ef = 0.16 * max(0.0, (fo - z) / (fo - self.z_hem)) ** 0.7 + (0.02 if z < fo else 0)
+            eb = 0.07 * max(0.0, (st - z) / (st - self.z_hem)) ** 0.8
+            ring = []
+            for i in range(seg + 1):
+                a = front + 2 * math.pi * i / seg
+                if z < fo and i == 0:
+                    a += ef
+                elif z < fo and i == seg:
+                    a -= ef
                 elif i == seg:
-                    a -= eps
-            return coat_xyz(z, a)
-        o, _ = self._strip('Coat', rows, seg, back, back + 2 * math.pi, xyz, closed=True,
-                           split_fn=lambda z: z < SLIT_TOP, weight_fn=lambda co: smooth((0.95 - co.z) / 0.9) ** 1.2)
-        self._wind_mods(o, 0.11, 0.03)
+                    ring.append(ring[0]); continue
+                if i == half and z < st:
+                    ring.append(bm.verts.new(self.cxyz(z, a - eb)))
+                    ring.append(bm.verts.new(self.cxyz(z, a + eb)))
+                    continue
+                if i == half:
+                    v = bm.verts.new(self.cxyz(z, a)); ring.append(v); ring.append(v); continue
+                ring.append(bm.verts.new(self.cxyz(z, a)))
+            rings.append(ring)
+        # ring tiene seg+2 entradas (indice half duplicado)
+        for r0, r1 in zip(rings[:-1], rings[1:]):
+            for i in range(seg + 1):
+                if i == half:
+                    continue      # salto entre las dos copias de la costura trasera
+                a0_, a1_ = r0[i], r0[i + 1]; b0_, b1_ = r1[i], r1[i + 1]
+                if len({a0_, a1_, b1_, b0_}) < 3:
+                    continue
+                try:
+                    bm.faces.new((a0_, a1_, b1_, b0_))
+                except ValueError:
+                    pass
+        o = mesh_obj('Coat', bm)
+        for p in o.data.polygons:
+            p.use_smooth = True
+        o.parent = self.root
+        o.data.materials.append(self.coat_mat)
+        vg = o.vertex_groups.new(name='w')
+        for v in o.data.vertices:
+            vg.add([v.index], self.hem_w(v.co.z), 'REPLACE')
+        o.modifiers.new('sol', 'SOLIDIFY').thickness = 0.012
+        self.coat_tex = self._wind_mods(o, 0.12, 0.03)
         self.coat = o
-        # ribete del bajo y de la abertura trasera
-        hem = [coat_xyz(0.06, back + 0.06 + (2 * math.pi - 0.12) * i / 80, inflate=0.006) for i in range(81)]
-        self._piping('HemPipe', hem, 0.004, weight=True)
+        back = -math.pi / 2
+        hem = [self.cxyz(self.z_hem + 0.005, back + 0.07 + (math.pi - 0.07 - 0.17) * i / 45, inflate=0.006)
+               for i in range(46)]
+        self._piping('HemPipeL', hem, 0.004, wind=True)
+        hem = [self.cxyz(self.z_hem + 0.005, back - 0.07 - (math.pi - 0.07 - 0.17) * i / 45, inflate=0.006)
+               for i in range(46)]
+        self._piping('HemPipeR', hem, 0.004, wind=True)
+        seam = [self.cxyz(z, back, inflate=0.004, folds=False)
+                for z in np.linspace(self.z_cape_bot - 0.02, st + 0.01, 20)]
+        self._piping('BackSeam', seam, 0.0025)
+
+    def cape_off(self, z):
+        return 0.022 + (self.z_cape_top - z) * 0.14
 
     def _capelet(self):
-        span = 1.95
+        span = 1.75
         back = -math.pi / 2
-        rows = list(np.linspace(1.545, 1.17, 14))
+        rows = list(np.linspace(self.z_cape_top, self.z_cape_bot, 16))
 
         def xyz(z, a, i):
-            infl = 0.02 + (1.545 - z) * 0.16
-            x, y, _ = coat_xyz(z, a, inflate=infl, folds=False)
-            dz = 0.012 * math.sin(9 * a) * (1.545 - z) * 3
+            x, y, _ = self.cxyz(z, a, inflate=self.cape_off(z), folds=False)
+            dz = 0.012 * math.sin(9 * a) * (self.z_cape_top - z) * 3
             return (x, y, z + dz)
-        o, rings = self._strip('Capelet', rows, 40, back - span, back + span, xyz,
+        o, rings = self._strip('Capelet', rows, 44, back - span, back + span, xyz,
                                mat=self.cape_mat, thick=0.01,
-                               weight_fn=lambda co: smooth((1.5 - co.z) / 0.33) * 0.6)
+                               weight_fn=lambda co: smooth((self.z_cape_top - 0.05 - co.z) / 0.25) * 0.6)
         self._wind_mods(o, 0.035, 0.012)
-        bottom = [xyz(1.17, back - span + 2 * span * i / 60, 0) for i in range(61)]
-        bottom = [(x * 1.02, y * 1.02, z - 0.004) for x, y, z in bottom]
+        bottom = [xyz(self.z_cape_bot, back - span + 2 * span * i / 70, 0) for i in range(71)]
+        bottom = [(x * 1.02, y * 1.02 - 0.001, z - 0.004) for x, y, z in bottom]
         self._piping('CapePipe', bottom, 0.0035)
 
     def _collar(self):
-        gap = 0.38
+        gap = 0.42
         back = -math.pi / 2
-        rows = list(np.linspace(1.55, 1.775, 6))
+        zb = self.z_neck - 0.01
+        CH = 0.045
+        rows = list(np.linspace(zb, zb + CH, 5))
+        nx = self.co[[i for i, d in enumerate(self.dom) if d.startswith('neck')], :]
+        cx, cy = nx[:, 0].mean(), nx[:, 1].mean()
+        r0 = max(np.abs(nx[:, 0] - cx).max(), np.abs(nx[:, 1] - cy).max()) + 0.004
 
         def xyz(z, a, i):
-            r = 0.1 + (z - 1.55) * 0.09
-            return (r * math.cos(a), 0.96 * r * math.sin(a), z)
-        self._strip('Collar', rows, 36, back - (math.pi - gap), back + (math.pi - gap), xyz,
+            r = r0 + (z - zb) * 0.12
+            return (cx + r * math.cos(a), cy + 0.95 * r * math.sin(a), z)
+        self._strip('Collar', rows, 40, back - (math.pi - gap), back + (math.pi - gap), xyz,
                     mat=self.cape_mat, thick=0.012)
-        top = [xyz(1.775, back - (math.pi - gap) + 2 * (math.pi - gap) * i / 50, 0) for i in range(51)]
-        self._piping('CollarPipe', top, 0.003)
+        top = [xyz(zb + CH, back - (math.pi - gap) + 2 * (math.pi - gap) * i / 50, 0) for i in range(51)]
+        pass  # sin ribete superior: se leia como un aro
 
     def _belt(self):
         back = -math.pi / 2
+        zw = self.z_waist - 0.04
 
         def xyz(z, a, i):
-            return coat_xyz(z, a, inflate=0.012, folds=False)
-        self._strip('Belt', [0.965, 0.995, 1.025], 56, back, back + 2 * math.pi, xyz,
+            return self.cxyz(z, a, inflate=0.012, folds=False)
+        self._strip('Belt', [zw - 0.03, zw, zw + 0.03], 64, back, back + 2 * math.pi, xyz,
                     closed=True, mat=self.leather_mat, thick=0.008)
-        x, y, z = coat_xyz(0.995, back, inflate=0.022, folds=False)
+        x, y, z = self.cxyz(zw, back, inflate=0.024, folds=False)
         bm = bmesh.new(); bmesh.ops.create_cube(bm, size=1.0)
         b = mesh_obj('Buckle', bm); b.parent = self.root
         b.location = (x, y, z); b.scale = (0.07, 0.012, 0.05)
@@ -566,7 +720,7 @@ class Figure:
         g = link(bpy.data.objects.new('BuckleGlow', ico('BG', 0.008, 2)))
         g.parent = self.root; g.location = (x, y - 0.008, z); g.data.materials.append(self.glow_mat)
 
-    def _piping(self, name, pts, r, weight=False):
+    def _piping(self, name, pts, r, wind=False):
         cd = bpy.data.curves.new(name, 'CURVE'); cd.dimensions = '3D'
         cd.bevel_depth = r; cd.bevel_resolution = 2
         sp = cd.splines.new('POLY'); sp.points.add(len(pts) - 1)
@@ -574,32 +728,210 @@ class Figure:
             sp.points[i].co = (*p, 1)
         o = link(bpy.data.objects.new(name, cd)); o.parent = self.root
         o.data.materials.append(self.glow_mat)
-        if weight:   # el bajo se mueve con el viento: misma textura que el abrigo
-            o.modifiers.new('mesh', 'NODES') if False else None
-            t1 = bpy.data.textures.get('CoatW1')
-            # convertir a malla para poder desplazarla igual que el abrigo
-            bpy.context.view_layer.update()
-            dg = bpy.context.evaluated_depsgraph_get()
-            me = bpy.data.meshes.new_from_object(o.evaluated_get(dg))
-            m = link(bpy.data.objects.new(name + 'M', me)); m.parent = self.root
-            m.data.materials.clear(); m.data.materials.append(self.glow_mat)
-            vg = m.vertex_groups.new(name='w')
-            for v in me.vertices:
-                vg.add([v.index], smooth((0.95 - v.co.z) / 0.9) ** 1.2, 'REPLACE')
-            d = m.modifiers.new('wind', 'DISPLACE'); d.texture = t1; d.direction = 'RGB_TO_XYZ'
-            d.texture_coords = 'OBJECT'; d.texture_coords_object = self.wind
-            d.strength = 0.11; d.vertex_group = 'w'
-            t2 = bpy.data.textures.get('CoatW2')
-            d2 = m.modifiers.new('flutter', 'DISPLACE'); d2.texture = t2
-            d2.texture_coords = 'OBJECT'; d2.texture_coords_object = self.wind
-            d2.strength = 0.03; d2.vertex_group = 'w'
-            bpy.data.objects.remove(o)
-            return m
-        return o
+        if not wind:
+            return o
+        bpy.context.view_layer.update()
+        dg = bpy.context.evaluated_depsgraph_get()
+        me = bpy.data.meshes.new_from_object(o.evaluated_get(dg))
+        m = link(bpy.data.objects.new(name + 'M', me)); m.parent = self.root
+        m.data.materials.clear(); m.data.materials.append(self.glow_mat)
+        vg = m.vertex_groups.new(name='w')
+        for v in me.vertices:
+            vg.add([v.index], self.hem_w(v.co.z), 'REPLACE')
+        t1, t2 = self.coat_tex
+        d = m.modifiers.new('wind', 'DISPLACE'); d.texture = t1; d.direction = 'RGB_TO_XYZ'
+        d.texture_coords = 'OBJECT'; d.texture_coords_object = self.wind
+        d.strength = 0.12; d.vertex_group = 'w'
+        d2 = m.modifiers.new('flutter', 'DISPLACE'); d2.texture = t2
+        d2.texture_coords = 'OBJECT'; d2.texture_coords_object = self.wind
+        d2.strength = 0.03; d2.vertex_group = 'w'
+        bpy.data.objects.remove(o)
+        return m
+
+    def _sub_body(self, name, keep_fn, push, mat):
+        """Copia de la malla del cuerpo (con pesos y esqueleto) restringida a una region
+        y empujada a lo largo de las normales: mangas, casquete del pelo..."""
+        me = self.h.body.data.copy(); me.name = name
+        ob = bpy.data.objects.new(name, me); link(ob)
+        for vg in self.h.body.vertex_groups:
+            ob.vertex_groups.new(name=vg.name)
+        names = {g.index: g.name for g in self.h.body.vertex_groups}
+        bm = bmesh.new(); bm.from_mesh(me)
+        dl = bm.verts.layers.deform.active
+        def dom(v):
+            d = v[dl]
+            return names[max(d.items(), key=lambda kv: kv[1])[0]] if d else ''
+        kill = [f for f in bm.faces if not keep_fn([dom(v) for v in f.verts], f)]
+        bmesh.ops.delete(bm, geom=kill, context='FACES')
+        bm.normal_update()
+        for v in bm.verts:
+            v.co += v.normal * push
+        bm.to_mesh(me); bm.free()
+        me.materials.clear(); me.materials.append(mat)
+        ob.parent = self.arm
+        ob.modifiers.new('rig', 'ARMATURE').object = self.arm
+        return ob
+
+    def _boots(self):
+        b = self._sub_body('Boots', lambda ds, f: all(d.startswith(('foot', 'toe', 'lowerleg')) for d in ds)
+                           and f.calc_center_median().z < 0.42 / SCALE, 0.009, self.leather_mat)
+        b.modifiers.new('sol', 'SOLIDIFY').thickness = 0.005
+        s = b.modifiers.new('sub', 'SUBSURF'); s.levels = 1; s.render_levels = 1
+
+    def _sleeves(self):
+        s = self._sub_body('Sleeves', lambda ds, f: all(d.startswith(ARMS + ('clavicle', 'spine05', 'breast'))
+                                                      or d.startswith('lowerarm02') for d in ds)
+                           and any(d.startswith(('upperarm', 'lowerarm')) for d in ds),
+                           0.022, self.coat_mat)
+        s.modifiers.new('sol', 'SOLIDIFY').thickness = 0.006
+        sb = s.modifiers.new('sub', 'SUBSURF'); sb.levels = 1; sb.render_levels = 2
+        # ribete luminoso en el puño
+        for side in 'LR':
+            bm = bmesh.new()
+            bmesh.ops.create_circle(bm, cap_ends=False, segments=24, radius=0.047)
+            bmesh.ops.rotate(bm, verts=bm.verts, cent=(0, 0, 0), matrix=Matrix.Rotation(math.pi / 2, 3, 'X'))
+            ring = mesh_obj('CuffRing' + side, bm)
+            sk = ring.modifiers.new('skin', 'WIREFRAME'); sk.thickness = 0.004
+            ring.data.materials.append(self.glow_mat)
+            ring.parent = self.arm; ring.parent_type = 'BONE'; ring.parent_bone = 'lowerarm02.' + side
+            ring.matrix_parent_inverse = Matrix.Identity(4)
+            ring.location = (0, -0.03, 0)
+
+    def _face(self):
+        mh = mhload.MH
+        eye_m, nt, p = mat_principled('Eyes', (1, 1, 1), rough=0.08, coat=1.0)
+        tex = nt.nodes.new('ShaderNodeTexImage')
+        tex.image = bpy.data.images.load(os.path.join(mh, 'eyes/materials/brown_eye.png'))
+        nt.links.new(tex.outputs['Color'], p.inputs['Base Color'])
+        self.h.fit_proxy(os.path.join(mh, 'eyes/high-poly/high-poly.mhclo'), 'Eyes', eye_m)
+        br_m, nt, p = mat_principled('Brows', (0.85, 0.85, 0.9), rough=0.6)
+        tex = nt.nodes.new('ShaderNodeTexImage')
+        tex.image = bpy.data.images.load(os.path.join(mh, 'eyebrows/eyebrow001/eyebrow001.png'))
+        nt.links.new(tex.outputs['Alpha'], p.inputs['Alpha'])
+        self.h.fit_proxy(os.path.join(mh, 'eyebrows/eyebrow001/eyebrow001.mhclo'), 'Brows', br_m)
+
+    def _scalp_sel(self, ds, f):
+        if not all(d == 'head' for d in ds):
+            return False
+        c = f.calc_center_median(); n = f.normal
+        hc = self.head_c_local
+        rel = c - hc
+        if rel.z < -0.14 or (rel.z < -0.03 and rel.y > -0.02) or (rel.z < -0.09 and abs(rel.x) > 0.045):
+            return False
+        if rel.y > 0.03 and rel.z < 0.06:        # cara y frente
+            return False
+        if abs(rel.x) > 0.062 and rel.z < -0.01 and rel.y > -0.015:  # orejas
+            return False
+        return True
+
+    def _hair(self, wind_strength, gust):
+        """~12k hebras reales (Curves) que nacen del cuero cabelludo del modelo."""
+        # coordenadas del cuerpo (sin escala del rig) para seleccionar el cuero cabelludo
+        inv = (self.arm.matrix_world).inverted()
+        self.head_c_local = inv @ self.head_c
+        cap = self._sub_body('HairCap', self._scalp_sel, 0.0015, self.cap_mat)
+        self.hair_cap = cap
+        bpy.context.view_layer.update()
+        mw = cap.matrix_world
+        dg = bpy.context.evaluated_depsgraph_get()
+        ev = cap.evaluated_get(dg); me = ev.to_mesh()
+        roots, normals, areas = [], [], []
+        for p in me.polygons:
+            roots.append(tuple(mw @ p.center)); normals.append(tuple((mw.to_3x3() @ p.normal).normalized()))
+            areas.append(p.area)
+        ev.to_mesh_clear()
+        roots = np.array(roots); normals = np.array(normals); areas = np.array(areas)
+        rng = np.random.default_rng(3)
+        P = 10
+        t = np.linspace(0, 1, P)
+        hc = np.array(self.head_c)
+        n_guides = 560
+        gidx = rng.choice(len(roots), n_guides, p=areas / areas.sum())
+        all_pts, radii = [], []
+        for gi in gidx:
+            d = normals[gi]; root = roots[gi]
+            rel = (root - hc) / np.linalg.norm(root - hc)
+            # campo de peinado: arriba hacia atras/arriba, lados y nuca hacia abajo
+            up = max(0.0, rel[2])
+            flow = np.array([rel[0] * 0.25, -0.55 - 0.3 * up, 1.0 * up - 0.9 * (1 - up)])
+            if rel[1] > 0.25:      # flequillo: hacia delante, abajo y a un lado
+                flow = np.array([0.5 + rng.uniform(-.3, .3), 0.6, -0.7])
+            flow += rng.normal(size=3) * 0.18
+            tang = flow - d * flow.dot(d); tang /= np.linalg.norm(tang) + 1e-9
+            g = tang * 0.85 + d * rng.uniform(0.18, 0.4) * (0.6 + up); g /= np.linalg.norm(g)
+            L = rng.uniform(0.06, 0.11) * (0.7 + 0.45 * up)
+            sweep = d * 0.15 * up + tang * 0.3 + np.array([0, 0, -0.35])
+            sweep /= np.linalg.norm(sweep)
+            twist = rng.normal(size=3) * 0.1
+            guide = (root[None] + g[None] * L * t[:, None] + sweep[None] * L * 0.4 * (t ** 2)[:, None]
+                     + twist[None] * L * 0.3 * (t ** 3)[:, None])
+            nch = 26
+            jit = rng.normal(size=(nch, 3)) * 0.008
+            jit -= np.outer(jit @ d, d)
+            lenf = rng.uniform(0.72, 1.06, nch)
+            clump = rng.uniform(0.85, 0.97)
+            for c in range(nch):
+                tt = t * lenf[c]
+                gi_ = np.array([np.interp(tt, t, guide[:, k]) for k in range(3)]).T
+                off = jit[c][None] * (1 - clump * tt[:, None] ** 0.8)
+                fr = rng.normal(size=(P, 3)) * 0.0012 * tt[:, None]
+                all_pts.append(gi_ + off + fr)
+                radii.append(np.linspace(0.0009, 0.00012, P) * rng.uniform(0.8, 1.2))
+        pts = np.concatenate(all_pts)
+        cv = bpy.data.hair_curves.new('Hair')
+        cv.add_curves([P] * len(all_pts))
+        cv.position_data.foreach_set('vector', pts.astype(np.float32).ravel())
+        ra = cv.attributes.get('radius') or cv.attributes.new('radius', 'FLOAT', 'POINT')
+        ra.data.foreach_set('value', np.concatenate(radii).astype(np.float32))
+        cv.materials.append(self.hair_mat)
+        o = link(bpy.data.objects.new('Hair', cv))
+        o.modifiers.new('wind', 'NODES').node_group = hair_wind_group(wind_strength, gust, 0.6)
+        self.hair_piv = empty('HairPiv', tuple(self.head_c))
+        self.parent_bone(self.hair_piv, 'head')
+        bpy.context.view_layer.update()
+        o.parent = self.hair_piv
+        o.matrix_parent_inverse = self.hair_piv.matrix_world.inverted()
+        self.hair = o
+
+    def _hood(self, up):
+        bm = bmesh.new()
+        R = 0.138
+        bmesh.ops.create_uvsphere(bm, u_segments=48, v_segments=28, radius=R)
+        kill = [v for v in bm.verts if (v.co.y > 0.0 and v.co.z < 0.06) or v.co.z < -0.17
+                or (v.co.y > 0.11)]
+        bmesh.ops.delete(bm, geom=kill, context='VERTS')
+        for v in bm.verts:
+            if v.co.y < 0 and v.co.z > 0:
+                v.co.y -= 0.075 * (v.co.z / R) ** 3
+                v.co.z += 0.02 * (v.co.z / R) ** 3
+            if v.co.z < -0.04:
+                f = (-0.04 - v.co.z) / 0.13
+                v.co.x *= 1 + 0.9 * f; v.co.y = v.co.y * (1 + 0.5 * f) - 0.02 * f
+        o = mesh_obj('Hood', bm)
+        o.location = tuple(self.head_c + Vector((0, -0.012, 0.012)))
+        o.scale = (0.96, 1.08, 1.06)
+        for p in o.data.polygons:
+            p.use_smooth = True
+        o.data.materials.append(self.cape_mat)
+        o.modifiers.new('sol', 'SOLIDIFY').thickness = 0.012
+        sub = o.modifiers.new('sub', 'SUBSURF'); sub.levels = 1; sub.render_levels = 2
+        ht = bpy.data.textures.new('HoodFolds', 'CLOUDS'); ht.noise_scale = 0.14
+        hd = o.modifiers.new('folds', 'DISPLACE'); hd.texture = ht; hd.strength = 0.018
+        hd.texture_coords = 'OBJECT'; hd.texture_coords_object = self.wind
+        self.parent_bone(o, 'head')
+        self.hood = o
+        self.hood_piv = o
+        if up:
+            self.hair_piv.scale = (0.6, 0.6, 0.6)
+            self.hair.hide_render = True
+            self.hair_cap.hide_render = True
+        else:
+            self.lower_hood_instant()
 
     def _scarf(self, lift):
-        n, w = 44, 0.12
-        start = Vector((0.03, -0.1, 1.62))
+        n, w = 44, 0.13
+        x0, ry0, cy0 = self.prof.at(self.z_neck - 0.04)
+        start = Vector((0.04, cy0 - ry0 - 0.06, self.z_neck - 0.02))
         bm = bmesh.new()
         rows = []
         for i in range(n + 1):
@@ -607,13 +939,11 @@ class Figure:
             if lift:
                 c = start + Vector((0.35 * s, -0.55 * s, 0.25 * s - 0.15 * s * s))
             else:
-                c = start + Vector((0.12 * s + 0.1 * s * s, -0.1 * s - 0.25 * s * s, -1.05 * s))
-            # pegado a la espalda en el primer tramo
-            if not lift:
-                zc = c.z
-                if zc > 0.2:
-                    _, ry = coat_radii(zc)
-                    c.y = min(c.y, -(ry + 0.05 + (1.53 - zc) * 0.0) - 0.035 * s)
+                c = start + Vector((0.12 * s + 0.1 * s * s, -0.08 * s - 0.25 * s * s, -1.0 * s))
+                if c.z > self.z_hem:
+                    x, ry, cy = self.prof.at(min(c.z, self.prof.z[-1]))
+                    back_y = cy - ry - 0.03 - (self.cape_off(c.z) if self.z_cape_bot < c.z < self.z_cape_top else 0)
+                    c.y = min(c.y, back_y - 0.03 - 0.035 * s)
             side = Vector((1, 0.15, 0)).normalized()
             ww = w * (1 - 0.25 * s)
             rows.append([bm.verts.new(c + side * ww * (j / 3 - 0.5)) for j in range(4)])
@@ -628,159 +958,12 @@ class Figure:
         for k, v in enumerate(o.data.vertices):
             s = (k // 4) / n
             vg.add([v.index], smooth(s * 1.4) * (0.7 + 0.3 * s), 'REPLACE')
-        sol = o.modifiers.new('sol', 'SOLIDIFY'); sol.thickness = 0.006
+        o.modifiers.new('sol', 'SOLIDIFY').thickness = 0.006
         wave = o.modifiers.new('wave', 'WAVE'); wave.use_x = True; wave.use_y = False
         wave.height = 0.035; wave.width = 0.5; wave.speed = 0.06; wave.narrowness = 1.2
         wave.vertex_group = 'w'
         self._wind_mods(o, 0.22, 0.05, scale_big=0.3, scale_small=0.08)
         self.scarf = o
-
-    def _head(self):
-        hp = self.head_piv
-        h = link(bpy.data.objects.new('Head', ico('Head', 0.1, 3)))
-        h.parent = hp; h.location = (0, 0.01, 0.14); h.scale = (0.88, 1.0, 1.12)
-        h.data.materials.append(self.skin_mat)
-        n = link(bpy.data.objects.new('Neck', ico('Neck', 0.05, 2)))
-        n.parent = self.root; n.location = (0, 0, 1.69); n.scale = (1, 1, 1.8)
-        n.data.materials.append(self.skin_mat)
-        for sx in (-1, 1):
-            e = link(bpy.data.objects.new('Ear', ico('Ear', 0.02, 2)))
-            e.parent = hp; e.location = (sx * 0.088, 0.005, 0.14)
-            e.scale = (0.45, 0.9, 1.4); e.data.materials.append(self.skin_mat)
-            # pendiente de luz (detalle)
-            ring = link(bpy.data.objects.new('Earring', ico('ER', 0.006, 2)))
-            ring.parent = hp; ring.location = (sx * 0.092, 0.0, 0.105)
-            ring.data.materials.append(self.glow_mat)
-        self.head = h
-
-    def _arms(self, right_up):
-        def arm(name, shoulder, rot):
-            piv = empty(name + 'Piv', shoulder); piv.parent = self.root
-            piv.rotation_euler = rot
-            bm = bmesh.new()
-            bmesh.ops.create_cone(bm, cap_ends=True, segments=20, radius1=0.055,
-                                  radius2=0.072, depth=0.6)
-            bmesh.ops.translate(bm, verts=bm.verts, vec=(0, 0, -0.3))
-            o = mesh_obj(name, bm); o.parent = piv
-            for p in o.data.polygons:
-                p.use_smooth = True
-            o.data.materials.append(self.coat_mat)
-            o.modifiers.new('sub', 'SUBSURF').render_levels = 2
-            bm = bmesh.new()
-            bmesh.ops.create_cone(bm, cap_ends=False, segments=20, radius1=0.064,
-                                  radius2=0.064, depth=0.07)
-            cuff = mesh_obj(name + 'Cuff', bm); cuff.parent = piv; cuff.location = (0, 0, -0.57)
-            cuff.data.materials.append(self.cape_mat)
-            cuff.modifiers.new('sol', 'SOLIDIFY').thickness = 0.01
-            tr = link(bpy.data.objects.new(name + 'Trim', ico('T', 1, 2)))
-            tr.parent = piv; tr.location = (0, 0, -0.605); tr.scale = (0.066, 0.066, 0.003)
-            tr.data.materials.append(self.glow_mat)
-            hand = link(bpy.data.objects.new(name + 'Hand', ico('Hand', 0.045, 2)))
-            hand.parent = piv; hand.location = (0, 0, -0.66); hand.scale = (0.8, 0.55, 1.3)
-            hand.data.materials.append(self.leather_mat)
-            return piv, hand
-        self.larm, self.lhand = arm('ArmL', (-0.275, 0, 1.43), (0, math.radians(-7), 0))
-        self.rarm_down = (0, math.radians(7), 0)
-        self.rarm_up = (math.radians(-128), 0, math.radians(-22))
-        self.rarm, self.rhand = arm('ArmR', (0.275, 0, 1.43),
-                                    self.rarm_up if right_up else self.rarm_down)
-
-    def _hair(self, wind_strength, gust):
-        """~11k hebras reales (Curves) agrupadas en mechones."""
-        self.hair_piv = empty('HairPiv', (0, 0.01, 0.14)); self.hair_piv.parent = self.head_piv
-        rng = np.random.default_rng(3)
-        P = 10                       # puntos por hebra
-        t = np.linspace(0, 1, P)
-        guides = []
-        while len(guides) < 420:
-            d = rng.normal(size=3); d /= np.linalg.norm(d)
-            if d[2] < -0.55 or (d[2] < -0.1 and d[1] > -0.2) or (d[1] > 0.55 and d[2] < 0.6):
-                continue
-            if d[1] > 0.3 and d[2] < 0.75 and rng.random() < 0.6:
-                continue
-            guides.append(d)
-        all_pts = []
-        radii = []
-        ell = np.array([0.088, 0.1, 0.112]) * 0.97
-        for d in guides:
-            if d[2] < 0.25:
-                flow = np.array([rng.uniform(-.3, .3), -0.1, -1.0])
-            elif d[1] > 0.25:   # flequillo: cae hacia delante y a un lado
-                flow = np.array([rng.uniform(-.8, .8), 1.0, -0.5])
-            else:
-                flow = np.array([rng.uniform(-.7, .7), rng.uniform(-.7, .1), 1.0])
-            tang = flow - d * flow.dot(d)
-            tang /= np.linalg.norm(tang) + 1e-9
-            g = tang * 0.72 + d * rng.uniform(0.3, 0.65)
-            g /= np.linalg.norm(g)
-            L = rng.uniform(0.06, 0.125) * (0.7 if d[2] < 0.25 else 1.0)
-            sweep = d * 0.35 + np.array([rng.uniform(-1, 1), rng.uniform(-1, 1), -0.45])
-            sweep /= np.linalg.norm(sweep)
-            twist = rng.normal(size=3) * 0.25
-            root = d * ell
-            guide = (root[None] + g[None] * L * t[:, None] + sweep[None] * L * 0.4 * (t ** 2)[:, None]
-                     + twist[None] * L * 0.3 * (t ** 3)[:, None])
-            nch = 26
-            jit = rng.normal(size=(nch, 3)) * 0.011
-            jit -= np.outer(jit @ d, d)            # en el plano tangente
-            lenf = rng.uniform(0.72, 1.06, nch)
-            clump = rng.uniform(0.75, 0.95)
-            for c in range(nch):
-                tt = t * lenf[c]
-                gi_ = np.array([np.interp(tt, t, guide[:, k]) for k in range(3)]).T
-                off = jit[c][None] * (1 - clump * tt[:, None] ** 0.8)
-                fr = rng.normal(size=(P, 3)) * 0.0012 * tt[:, None]
-                all_pts.append(gi_ + off + fr)
-                radii.append(np.linspace(0.00085, 0.00012, P) * rng.uniform(0.8, 1.2))
-        pts = np.concatenate(all_pts)
-        cv = bpy.data.hair_curves.new('Hair')
-        cv.add_curves([P] * len(all_pts))
-        cv.position_data.foreach_set('vector', pts.astype(np.float32).ravel())
-        ra = cv.attributes.get('radius') or cv.attributes.new('radius', 'FLOAT', 'POINT')
-        ra.data.foreach_set('value', np.concatenate(radii).astype(np.float32))
-        cv.materials.append(self.hair_mat)
-        o = link(bpy.data.objects.new('Hair', cv)); o.parent = self.hair_piv
-        mod = o.modifiers.new('wind', 'NODES')
-        mod.node_group = hair_wind_group(wind_strength, gust, 0.6)
-        self.hair = o
-        # casquete bajo el pelo para que no se vea piel entre hebras
-        cap = link(bpy.data.objects.new('HairCap', ico('Cap', 1.0, 3)))
-        cap.parent = self.hair_piv; cap.scale = tuple(ell * 1.015)
-        hm, _, _ = mat_principled('HairCapM', (0.55, 0.56, 0.65), rough=0.5, sheen=0.6)
-        cap.data.materials.append(hm)
-        bmc = cap.data
-        self.hair_cap = cap
-
-    def _hood(self, up):
-        bm = bmesh.new()
-        bmesh.ops.create_uvsphere(bm, u_segments=48, v_segments=28, radius=0.15)
-        kill = [v for v in bm.verts if (v.co.y > 0.0 and v.co.z < 0.08) or v.co.z < -0.16
-                or (v.co.y > 0.105)]
-        bmesh.ops.delete(bm, geom=kill, context='VERTS')
-        for v in bm.verts:
-            if v.co.y < 0 and v.co.z > 0:
-                v.co.y -= 0.06 * (v.co.z / 0.15) ** 2
-            if v.co.z < -0.04:
-                f = (-0.04 - v.co.z) / 0.12
-                v.co.x *= 1 + 0.9 * f; v.co.y = v.co.y * (1 + 0.5 * f) - 0.02 * f
-        self.hood_piv = empty('HoodPiv', (0, -0.06, -0.04)); self.hood_piv.parent = self.head_piv
-        o = mesh_obj('Hood', bm); o.parent = self.hood_piv
-        o.location = (0, 0.07, 0.185); o.scale = (0.95, 1.05, 1.05)
-        for p in o.data.polygons:
-            p.use_smooth = True
-        o.data.materials.append(self.cape_mat)
-        o.modifiers.new('sol', 'SOLIDIFY').thickness = 0.012
-        sub = o.modifiers.new('sub', 'SUBSURF'); sub.levels = 1; sub.render_levels = 2
-        ht = bpy.data.textures.new('HoodFolds', 'CLOUDS'); ht.noise_scale = 0.05
-        hd = o.modifiers.new('folds', 'DISPLACE'); hd.texture = ht; hd.strength = 0.02
-        hd.texture_coords = 'OBJECT'; hd.texture_coords_object = self.wind
-        self.hood = o
-        if up:
-            self.hair_piv.scale = (0.6, 0.6, 0.6)
-            self.hair.hide_render = True
-            self.hair_cap.hide_render = True
-        else:
-            self.lower_hood_instant()
 
     def dissolve_material(self):
         """Tela que se deshace con bordes de luz cian (umbral en el nodo 'Thr')."""
@@ -841,11 +1024,11 @@ class Figure:
         set_linear(self.wind)
 
 
-def rim_lights(target, cyan=900, magenta=700, fill=12, z=2.3):
+def rim_lights(target, cyan=900, magenta=700, fill=45, z=2.3):
     area_light('RimC', (-1.6, 2.6, z), target, (0.25, 0.85, 1.0), cyan, 1.5)
     area_light('RimM', (1.7, 2.4, z - 0.2), target, (1.0, 0.3, 0.75), magenta, 1.5)
     area_light('Fill', (-2.0, -3.0, 2.2), target, (1.0, 0.75, 0.55), fill, 3)
-    area_light('Top', (0.3, 0.6, 4.5), target, (0.6, 0.7, 1.0), 50, 2)
+    area_light('Top', (0.3, 0.6, 4.5), target, (0.6, 0.7, 1.0), 110, 2)
 
 
 def dust(n, box, mat, rmin=0.004, rmax=0.012, seed=3, parent=None):
@@ -1075,14 +1258,14 @@ def shot3():
     fig.hood.data.materials[0] = hm
     thr = hm.node_tree.nodes['Thr'].outputs[0]
     thr.default_value = -0.05; thr.keyframe_insert('default_value', frame=60)
-    thr.default_value = 1.05; thr.keyframe_insert('default_value', frame=125)
+    thr.default_value = 1.05; thr.keyframe_insert('default_value', frame=112)
     for ob in (fig.hair, fig.hair_cap):
         ob.hide_render = True; ob.keyframe_insert('hide_render', frame=69)
         ob.hide_render = False; ob.keyframe_insert('hide_render', frame=70)
     fig.hair_piv.scale = (0.6, 0.6, 0.6); fig.hair_piv.keyframe_insert('scale', frame=70)
     fig.hair_piv.scale = (1.02, 1.02, 1.05); fig.hair_piv.keyframe_insert('scale', frame=112)
     fig.hair_piv.scale = (1, 1, 1); fig.hair_piv.keyframe_insert('scale', frame=126)
-    tgt = empty('Tgt', (0, 0, 1.76))
+    tgt = empty('Tgt', (0, 0.02, 1.66))
     rim_lights(tgt, cyan=1100, magenta=900)
     # particulas que empiezan a flotar
     pmat = mat_emit('Spark', (0.6, 0.85, 1.0), 12)
@@ -1090,9 +1273,9 @@ def shot3():
     dust(220, ((-1.2, 1.2), (-1.0, 1.2), (0.6, 2.4)), pmat, 0.002, 0.007, seed=9, parent=pp)
     pp.keyframe_insert('location', frame=120)
     pp.location = (0, 0, 0.9); pp.keyframe_insert('location', frame=SHOT_LEN[3]); set_linear(pp)
-    cam = camera('Cam', (0.55, -2.5, 1.66), tgt, lens=45, fstop=1.4)
+    cam = camera('Cam', (0.9, -1.75, 1.8), tgt, lens=50, fstop=1.6)
     cam.keyframe_insert('location', frame=1)
-    cam.location = (0.3, -1.85, 1.76); cam.keyframe_insert('location', frame=SHOT_LEN[3])
+    cam.location = (0.62, -1.2, 1.75); cam.keyframe_insert('location', frame=SHOT_LEN[3])
     compositor(bloom=0.5, threshold=1.2, size=0.85)
 
 
@@ -1143,18 +1326,23 @@ def shot4():
     fig = Figure(loc=(0, 0, 0), hood_up=False, right_arm_up=True)
     fig.animate_wind(SHOT_LEN[4], speed=0.08, gust=(0.3, 0.2, 1.0))
     tgt = empty('Tgt', (0, 0, 1.6))
-    # orbe en la mano
-    hand_w = fig.rhand.matrix_world.translation if False else None
-    bpy.context.view_layer.update()
-    hpos = fig.rhand.matrix_world.translation.copy()
+    fig = fig
+    # el brazo derecho se alza durante los primeros 3 s
+    fig.arm_rest(frame=1); fig.arm_up(frame=72)
+    fig.head((0, 0, 0), frame=1); fig.head((-14, 0, 6), frame=80)
+    # orbe en la mano (sigue al hueso de la muneca)
     orb_mat = mat_emit('Orb', (1.0, 0.25, 0.55), 30)
-    orb = link(bpy.data.objects.new('Orb', ico('Orb', 0.09, 3)))
-    orb.location = hpos + Vector((0, 0.12, 0.1)); orb.data.materials.append(orb_mat)
-    orb.scale = (0.2,) * 3; orb.keyframe_insert('scale', frame=1)
-    orb.scale = (1,) * 3; orb.keyframe_insert('scale', frame=90)
-    orb.scale = (1.6,) * 3; orb.keyframe_insert('scale', frame=SHOT_LEN[4])
-    pl = point_light('OrbLight', orb.location, (1.0, 0.3, 0.55), 80, 0.1)
-    pl.data.energy = 30; pl.data.keyframe_insert('energy', frame=1)
+    orb = link(bpy.data.objects.new('Orb', ico('Orb', 0.07, 3)))
+    orb.data.materials.append(orb_mat)
+    orb.parent = fig.arm; orb.parent_type = 'BONE'; orb.parent_bone = 'wrist.R'
+    orb.matrix_parent_inverse = Matrix.Identity(4); orb.location = (0, 0.09, 0)
+    orb.scale = (0.15,) * 3; orb.keyframe_insert('scale', frame=40)
+    orb.scale = (1,) * 3; orb.keyframe_insert('scale', frame=110)
+    orb.scale = (1.5,) * 3; orb.keyframe_insert('scale', frame=SHOT_LEN[4])
+    pl = point_light('OrbLight', (0, 0, 0), (1.0, 0.3, 0.55), 80, 0.1)
+    pl.parent = fig.arm; pl.parent_type = 'BONE'; pl.parent_bone = 'wrist.R'
+    pl.matrix_parent_inverse = Matrix.Identity(4); pl.location = (0, 0.12, 0)
+    pl.data.energy = 10; pl.data.keyframe_insert('energy', frame=40)
     pl.data.energy = 600; pl.data.keyframe_insert('energy', frame=SHOT_LEN[4])
     area_light('RimV', (-1.8, 2.2, 2.8), tgt, (0.55, 0.3, 1.0), 900, 2)
     area_light('RimR', (1.8, 1.8, 0.6), tgt, (1.0, 0.15, 0.2), 700, 2)
@@ -1243,6 +1431,7 @@ def shot5():
     # el titulo flota delante de la camara al final
     title.parent = cam; title.location = (0, -0.35, -3.0); title.rotation_euler = (0, 0, 0)
     title.scale = (0.32,) * 3
+    title.hide_render = True   # el titulo se compone nitido en post (finalize.sh)
     compositor(bloom=1.0, threshold=0.85, size=0.92)
 
 
