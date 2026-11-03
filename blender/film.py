@@ -1399,10 +1399,14 @@ def shot4():
 def shot5():
     s = reset(); s.frame_end = SHOT_LEN[5]
     city()
+    for o in [o for o in bpy.data.objects if o.name.startswith('Lamp') and o.location.y < 16]:
+        bpy.data.objects.remove(o)
     fig = Figure(loc=(0, 0, 0), hood_up=False)
     fig.animate_wind(SHOT_LEN[5], speed=0.06)
     tgt = empty('Tgt', (0, 0, 1.2))
     rim_lights(tgt)
+    for n in ('RimC', 'RimM', 'Fill', 'Top'):
+        bpy.data.objects[n].visible_glossy = False
     # columna de luz
     bmat = mat_emit('Beam', (0.55, 0.35, 1.0), 0)
     bn = bmat.node_tree.nodes['Emission'].inputs['Strength']
@@ -1448,11 +1452,14 @@ def main():
     ap.add_argument('--outdir')
     ap.add_argument('--samples', type=int)
     ap.add_argument('--percent', type=int, default=100)
+    ap.add_argument('--res')
     ap.add_argument('--save-blend')
     a = ap.parse_args(argv)
     SHOTS[a.shot]()
     s = bpy.context.scene
     s.render.resolution_percentage = a.percent
+    if a.res:
+        s.render.resolution_x, s.render.resolution_y = map(int, a.res.split('x'))
     if a.samples:
         s.eevee.taa_render_samples = a.samples
     if a.save_blend:
