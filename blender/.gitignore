@@ -3,3 +3,4 @@ frames/
 *.blend1
 audio/voz_alineada.wav
 /assets_dl/
+render.log
