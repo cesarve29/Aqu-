@@ -12,7 +12,7 @@ const css = fs.readFileSync(path.join(__dirname, 'common.css'), 'utf8');
 const defs = fs.readFileSync(path.join(__dirname, 'scene.svg.txt'), 'utf8');
 
 function scene(W, H, o) {
-  const hy = o.horizon, r = o.sunR, cx = o.sunX;
+  const hy = o.horizon, r = o.sunR, cx = o.sunX, rise = o.sunRise || 0, gridOff = o.gridOff || 0;
   let grid = '';
   const n = 28;
   for (let i = -n; i <= n; i++) {
@@ -20,7 +20,7 @@ function scene(W, H, o) {
     grid += `<line x1="${W / 2 + i * 6}" y1="${hy}" x2="${x2}" y2="${H}" />`;
   }
   for (let k = 1; k <= 12; k++) {
-    const y = hy + (H - hy) * Math.pow(k / 12, 2.2);
+    const y = hy + (H - hy) * Math.pow(((k - gridOff) % 12 + 12) % 12 / 12, 2.2);
     grid += `<line x1="0" y1="${y}" x2="${W}" y2="${y}" />`;
   }
   const palms = (o.palms || []).map(p =>
@@ -39,7 +39,7 @@ function scene(W, H, o) {
   ${defs}
   <rect width="${W}" height="${hy}" fill="url(#sky)"/>
   <g mask="url(#sunmask)"></g>
-  <svg x="${cx - r}" y="${hy - r * 1.35}" width="${2 * r}" height="${2 * r}" viewBox="0 0 1 1" overflow="visible">
+  <svg x="${cx - r}" y="${hy - r * 1.35 + rise}" width="${2 * r}" height="${2 * r}" viewBox="0 0 1 1" overflow="visible">
     <circle cx=".5" cy=".5" r=".5" fill="url(#sun)" mask="url(#sunstripes)" style="filter:drop-shadow(0 0 .06px #ff5fa8)"/>
   </svg>
   ${city}
@@ -87,7 +87,9 @@ const thumb = (() => {
   <div style="position:absolute;right:30px;bottom:30px;width:360px;height:240px;border:6px dashed #fff8;border-radius:16px;display:flex;align-items:center;justify-content:center" class="sub"><span style="font-size:26px;opacity:.8;text-align:center">AQUÍ VA UN<br>FOTOGRAMA DEL CLIP</span></div>`);
 })();
 
-(async () => {
+module.exports = { scene, css, defs, NAME_A, NAME_B, TAG, INITIALS };
+
+if (require.main === module) (async () => {
   const outDir = path.join(__dirname, '..');
   const browser = await chromium.launch();
   for (const [name, html, W, H] of [['banner', banner, 2560, 1440], ['foto-perfil', avatar, 800, 800], ['miniatura-plantilla', thumb, 1280, 720]]) {
