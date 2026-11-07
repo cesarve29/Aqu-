@@ -4,10 +4,10 @@ const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
 
-const NAME_A = process.env.NAME_A || 'LEONIDA';
-const NAME_B = process.env.NAME_B || 'CLIPS';
+const NAME_A = process.env.NAME_A || 'SEIS EN';
+const NAME_B = process.env.NAME_B || 'VICE';
 const TAG = process.env.TAG || 'LO MEJOR DE GTA 6 EN MENOS DE 1 MINUTO';
-const INITIALS = process.env.INITIALS || 'LC';
+const INITIALS = process.env.INITIALS || '6V';
 const css = fs.readFileSync(path.join(__dirname, 'common.css'), 'utf8');
 const defs = fs.readFileSync(path.join(__dirname, 'scene.svg.txt'), 'utf8');
 

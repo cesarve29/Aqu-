@@ -5,18 +5,16 @@
 
 ## 1. Nombre del canal (propuestas)
 
-Nombre de trabajo usado en el diseño: **Leonida Clips** (Leonida es el estado ficticio donde transcurre GTA 6).
+Nombre elegido: **Seis en Vice** — `@SeisEnVice`
 
-Alternativas si prefieres otro:
-- **Leonida Clips** — corto, identificable con GTA 6 sin usar la marca registrada.
-- **Vice Momentos**
-- **Clips de Leonida**
-- **GTA 6 al Instante** *(más directo para el buscador, pero usa la marca en el nombre)*
+- "Seis" es un guiño a GTA **6** sin usar la marca en el nombre; "Vice" conecta con Vice City.
+- Logo/foto de perfil: **6V**.
+- Regístralo también en TikTok e Instagram (`@seisenvice`) antes del lanzamiento.
 
 > Evita usar el logo oficial de GTA o la tipografía de Rockstar en banner/perfil: el diseño
 > incluido es 100 % original (estilo atardecer neón de Florida) para no tener problemas de marca.
 
-Handle sugerido: `@LeonidaClips` (comprueba disponibilidad al crear el canal).
+Handle: `@SeisEnVice` (libre en YouTube a 7-nov-2026; regístralo cuanto antes).
 
 ## 2. Archivos de imagen
 
@@ -28,19 +26,19 @@ Handle sugerido: `@LeonidaClips` (comprueba disponibilidad al crear el canal).
 
 Para regenerarlos con otro nombre (desde la carpeta `diseno/`):
 ```bash
-NAME_A="VICE" NAME_B="MOMENTOS" INITIALS="VM" node render.js
+NAME_A="SEIS EN" NAME_B="VICE" INITIALS="6V" node render.js   # valores por defecto
 ```
 
 ## 3. Descripción del canal
 
 ```
-🌴 Lo mejor de GTA 6 en menos de 1 minuto 🌴
+🌴 SEIS EN VICE — Lo mejor de GTA 6 en menos de 1 minuto 🌴
 
 Momentos épicos, fails, secretos, easter eggs, persecuciones y todo lo que está
 pasando en Leonida y Vice City, recortado en Shorts para que no te pierdas nada.
 
 📅 Shorts nuevos cada día
-🔔 Suscríbete y activa la campanita para no perderte ningún clip
+🔔 Suscríbete a Seis en Vice y activa la campanita para no perderte ningún clip
 
 🎮 Contenido de fans. No afiliado a Rockstar Games ni Take-Two Interactive.
 Grand Theft Auto es una marca registrada de Take-Two Interactive.
@@ -49,7 +47,7 @@ Grand Theft Auto es una marca registrada de Take-Two Interactive.
 ```
 
 **Palabras clave del canal** (Configuración → Canal → Información básica):
-`GTA 6, GTA VI, Grand Theft Auto 6, GTA 6 shorts, GTA 6 clips, GTA 6 español, Vice City, Leonida, Lucia y Jason, GTA 6 momentos épicos, GTA 6 fails, GTA 6 secretos, GTA 6 easter eggs, gameplay GTA 6`
+`Seis en Vice, GTA 6, GTA VI, Grand Theft Auto 6, GTA 6 shorts, GTA 6 clips, GTA 6 español, Vice City, Leonida, Lucia y Jason, GTA 6 momentos épicos, GTA 6 fails, GTA 6 secretos, GTA 6 easter eggs, gameplay GTA 6`
 
 ## 4. Títulos para Shorts — fórmulas que funcionan
 
@@ -74,9 +72,9 @@ Al final del título o en la descripción: `#GTA6 #Shorts`.
 [1 frase que describe el clip con la palabra clave principal]
 Ej: Este detalle de las físicas de GTA 6 en Vice City te va a volar la cabeza 🤯
 
-🔔 Suscríbete para más clips de GTA 6 cada día
+🔔 Suscríbete a @SeisEnVice para más clips de GTA 6 cada día
 
-#GTA6 #GTAVI #Shorts #ViceCity #GTA6Clips
+#GTA6 #GTAVI #Shorts #ViceCity #SeisEnVice
 ```
 - Los **3 primeros hashtags** aparecen encima del título: pon siempre `#GTA6` primero.
 - No pongas más de ~5 hashtags (más de 15 hace que YouTube los ignore todos).
