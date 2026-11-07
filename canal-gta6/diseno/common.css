@@ -1,0 +1,7 @@
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Montserrat:wght@600;800;900&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#120626;overflow:hidden}
+.title{font-family:'Anton',sans-serif;letter-spacing:.04em;color:#fff;line-height:.95}
+.neon-pink{text-shadow:0 0 6px #ff3fb4,0 0 18px #ff3fb4,0 0 40px #ff2a8a}
+.neon-cyan{color:#5ef2ff;text-shadow:0 0 6px #34e1ff,0 0 20px #18b8ff,0 0 44px #0f8cff}
+.sub{font-family:'Montserrat',sans-serif;font-weight:800;color:#fff}
