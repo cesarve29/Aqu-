@@ -20,8 +20,15 @@ Guía completa (títulos, descripciones, etiquetas, derechos): `canal-gta6/GUIA-
 6. No usar el logo oficial de GTA/Rockstar ni música comercial. Material de terceros solo en
    fragmentos breves y con aporte propio; avisar al usuario del riesgo de reclamaciones.
 
+7. **Efectos de sonido: usar SIEMPRE la biblioteca `canal-gta6/sfx/`** (generados con ElevenLabs,
+   ver `canal-gta6/sfx/README.md`). No sintetizar efectos ni generar nuevos si ya existe uno adecuado.
+   Mezclar con `canal-gta6/diseno/biblioteca-sfx.js`. Si hace falta un efecto nuevo, generarlo con
+   ElevenLabs, añadirlo a la biblioteca y al README.
+8. En los Shorts con material del tráiler: el audio original se elimina; solo efectos de sonido
+   (la música la añade el usuario). Vídeo del tráiler grande, sin bordes de color, fundido con el fondo.
+
 ### Herramientas
 
-- Diseños y animaciones se generan con `canal-gta6/diseno/render.js` e `intro.js` (Playwright + ffmpeg).
+- Diseños y animaciones: `canal-gta6/diseno/` (`banner.js`, `avatar.js`, `intro.js`, `cuenta-atras.js`, `componer-cuenta-atras.js`).
 - `yt-dlp` no viene instalado (`pip install -U yt-dlp`); YouTube suele bloquear las descargas
   desde servidores en la nube, así que el material normalmente llega por Google Drive.

@@ -1,83 +1,98 @@
-// Monta cada Short de la cuenta atrás:
-//   [gancho: 4 cortes rápidos del tráiler] + [segmento animado del día] + [cierre del canal]
-// Audio: SOLO efectos de sonido (el usuario añade la música después). El audio del tráiler se elimina.
+// Monta cada Short de la cuenta atrás (15 s, vertical 1080x1920):
+//   0-4 s    gancho: 5 cortes del tráiler (lo más fuerte primero)
+//   4-10 s   número del día con reloj de neón
+//   10-13 s  4 cortes más del tráiler
+//   13-15 s  cierre "SUSCRÍBETE @SeisEnVice"
+// Audio: SOLO efectos de sonido de la biblioteca (../sfx). El audio del tráiler se elimina; la música la pone el usuario.
 // Uso: node componer-cuenta-atras.js <trailer.mp4> [dia ...]
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { execFileSync } = require('child_process');
-const { mix } = require('./sfx');
+const { mezclar } = require('./biblioteca-sfx');
 
 const TRAILER = process.argv[2];
 const DAYS = process.argv.slice(3).map(Number);
 const LIST = DAYS.length ? DAYS : [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
-const CUT = 0.55, NCUTS = 4, HOOK = CUT * NCUTS, CIERRE = 2.0;
 const ROOT = path.join(__dirname, '..');
+const GANCHO = { n: 5, dur: 0.8 }, PUENTE = { n: 4, dur: 0.75 };
+const T_CUENTA = GANCHO.n * GANCHO.dur, SEG = 6.0, T_PUENTE = T_CUENTA + SEG, T_CIERRE = T_PUENTE + PUENTE.n * PUENTE.dur, TOTAL = T_CIERRE + 2.0;
 // Momentos elegidos del tráiler (segundo de inicio), ordenados por impacto
-const MOMENTOS = [1223.1, 721.6, 1567.8, 1086.7, 1043.0, 1275.6, 1116.5, 1082.0, 524.0, 992.2, 1236.3, 1433.0,
-  568.0, 1028.0, 719.4, 1073.5, 593.4, 1144.2, 711.4, 1068.0, 800.0, 1151.0, 950.1, 1210.0];
-
+const MOMENTOS = [1223.1, 1126.1, 721.6, 1567.8, 1086.7, 1065.0, 1043.0, 1275.6, 543.5, 1116.5, 832.8, 1045.5, 1082.0, 524.0,
+  992.2, 1569.0, 1236.3, 1433.0, 769.4, 371.3, 1030.5, 1553.0, 568.0, 1028.0, 552.2, 1109.3, 719.4, 1160.5, 1073.5, 732.3,
+  593.4, 468.1, 1144.2, 1050.4, 711.4, 1068.0, 545.0, 1573.9, 800.0, 1151.0, 1172.3, 950.1, 570.0, 1210.0];
+const POR_DIA = GANCHO.n + PUENTE.n;
 const ff = (args) => execFileSync('ffmpeg', ['-nostdin', '-y', '-loglevel', 'error', ...args]);
 
-function cortesDelDia(day) {
-  const k = 12 - day; // día 12 -> 0
-  return Array.from({ length: NCUTS }, (_, j) => {
-    const idx = (k * NCUTS + j) % MOMENTOS.length;
-    const vuelta = Math.floor((k * NCUTS + j) / MOMENTOS.length);
-    return MOMENTOS[idx] + vuelta * 1.2; // en la segunda vuelta, otro instante del mismo plano
+function momentos(day) {
+  const k = 12 - day;
+  return Array.from({ length: POR_DIA }, (_, j) => {
+    const i = k * POR_DIA + j;
+    return MOMENTOS[i % MOMENTOS.length] + Math.floor(i / MOMENTOS.length) * 1.3; // en otra vuelta, otro instante del plano
   });
 }
 
-function gancho(day, tmp) {
-  const parts = cortesDelDia(day).map((t, j) => {
-    const out = path.join(tmp, `g${j}.mp4`);
-    // fondo desenfocado + banda central con zoom de impacto + bordes de neón + destello al entrar
-    ff(['-ss', String(t), '-t', String(CUT), '-i', TRAILER, '-an', '-filter_complex',
-      `[0:v]fps=30,eq=saturation=1.35:contrast=1.08,colorbalance=rs=.10:bs=.12,split[a][b];` +
-      `[a]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=28:2,eq=brightness=-0.18[bg];` +
-      `[b]scale=2133:1200,zoompan=z='1.14-0.14*min(on/${Math.round(CUT * 30)},1)':d=1:s=2133x1200:fps=30,crop=1080:1200[fg];` +
-      `[bg][fg]overlay=0:360,drawbox=x=0:y=352:w=1080:h=8:color=0xff3fb4:t=fill,drawbox=x=0:y=1560:w=1080:h=8:color=0x5ef2ff:t=fill,` +
-      `fade=in:st=0:d=0.07:color=white,setsar=1,format=yuv420p[v]`,
-      '-map', '[v]', '-c:v', 'libx264', '-crf', '18', '-r', '30', out]);
-    return out;
-  });
-  return parts;
+// Máscara con bordes difuminados para fundir el vídeo con el fondo (sin líneas)
+function mascara(tmp) {
+  const m = path.join(tmp, 'mask.png');
+  ff(['-f', 'lavfi', '-i', 'color=white:s=1080x1500', '-frames:v', '1', '-vf',
+    "format=gray,geq=lum='255*min(1,min(Y/170,(H-1-Y)/170))'", m]);
+  return m;
 }
 
-function sonidosCierre(t0) {
-  // mismo ritmo que la animación del cierre: VICE se enciende a los 0,25 s
-  return [{ t: t0, fx: 'whoosh', gain: 0.6 }, { t: t0 + 0.05, fx: 'neon', gain: 0.5 }, { t: t0 + 0.25, fx: 'impacto', gain: 0.7 },
-    { t: t0 + 0.25, fx: 'neon', gain: 0.4, pan: -0.3 }, { t: t0 + 0.55, fx: 'pop', gain: 0.6 }];
+function corte(t, dur, out, mask) {
+  ff(['-ss', String(t), '-t', String(dur), '-i', TRAILER, '-loop', '1', '-i', mask, '-an', '-filter_complex',
+    `[0:v]fps=30,eq=saturation=1.3:contrast=1.06,colorbalance=rs=.06:bs=.08,split[a][b];` +
+    `[a]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:2,eq=brightness=-0.12[bg];` +
+    `[b]scale=2667:1500,zoompan=z='1.12-0.12*min(on/${Math.round(dur * 30)},1)':d=1:s=2667x1500:fps=30,crop=1080:1500,format=rgba[fg0];` +
+    `[1:v]format=gray,scale=1080:1500[m];[fg0][m]alphamerge[fg];` +
+    `[bg][fg]overlay=0:210:shortest=1,fade=in:st=0:d=0.06:color=white,setsar=1,format=yuv420p[v]`,
+    '-map', '[v]', '-t', String(dur), '-c:v', 'libx264', '-crf', '17', '-r', '30', out]);
+  return out;
+}
+
+function sonidos() {
+  const ev = [];
+  for (let j = 0; j < GANCHO.n; j++) {
+    const t = j * GANCHO.dur;
+    if (j === 0) ev.push({ t: 0, sfx: 'impacto', gain: 1 }, { t: 0, sfx: 'whoosh', gain: 0.5 });
+    else ev.push({ t: t - 0.08, sfx: 'whoosh', gain: 0.65, pan: j % 2 ? 0.35 : -0.35, variante: j }, { t, sfx: 'glitch', gain: 0.45, variante: j });
+  }
+  // cuenta atrás (tiempos de cuenta-atras.js)
+  const C = T_CUENTA;
+  ev.push({ t: C, sfx: 'braam', gain: 0.9 }, { t: C, sfx: 'impacto', gain: 0.7, variante: 1 }, { t: C + 0.05, sfx: 'neon', gain: 0.45 },
+    { t: C + 1.0, sfx: 'whoosh', gain: 0.55, variante: 2 }, { t: C + 1.6, sfx: 'pop', gain: 0.6 });
+  for (let i = 0; i < 8; i++) ev.push({ t: C + 0.6 + i * 0.5, sfx: 'tic', gain: 0.7, pan: i % 2 ? 0.2 : -0.2, variante: i });
+  ev.push({ t: C + 4.85, sfx: 'subida', gain: 0.6, alFinal: true }, { t: C + 4.85, sfx: 'impacto', gain: 0.85, variante: 2 },
+    { t: C + 4.85, sfx: 'stinger', gain: 0.7 });
+  for (let j = 0; j < PUENTE.n; j++) {
+    const t = T_PUENTE + j * PUENTE.dur;
+    ev.push({ t: t - 0.08, sfx: 'whoosh', gain: 0.6, pan: j % 2 ? -0.35 : 0.35, variante: j + 1 });
+    if (j % 2 === 0) ev.push({ t, sfx: 'glitch', gain: 0.4, variante: j + 2 });
+  }
+  ev.push({ t: T_CIERRE - 0.05, sfx: 'whoosh', gain: 0.5, variante: 3 }, { t: T_CIERRE + 0.05, sfx: 'neon', gain: 0.45, variante: 1 },
+    { t: T_CIERRE + 0.25, sfx: 'impacto', gain: 0.6, variante: 3 }, { t: T_CIERRE + 0.55, sfx: 'pop', gain: 0.6, variante: 1 });
+  return ev;
 }
 
 for (const day of LIST) {
   const name = `dia-${String(day).padStart(2, '0')}`;
   const seg = path.join(ROOT, 'cuenta-atras', 'segmentos', `${name}.mp4`);
-  const meta = JSON.parse(fs.readFileSync(path.join(ROOT, 'cuenta-atras', 'segmentos', `${name}.json`)));
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'comp-'));
-  const parts = [...gancho(day, tmp), seg, path.join(ROOT, 'intro', 'cierre-shorts-9x16.mp4')];
-
-  // línea de tiempo de sonido
-  const ev = [];
-  for (let j = 0; j < NCUTS; j++) {
-    const t = j * CUT;
-    ev.push(j === 0 ? { t: 0, fx: 'impacto', gain: 0.85 } : { t, fx: 'glitch', gain: 0.7, pan: j % 2 ? 0.3 : -0.3 });
-    ev.push({ t: Math.max(0, t - 0.12), fx: 'whoosh', args: [0.3], gain: 0.7, pan: j % 2 ? -0.4 : 0.4 });
-  }
-  for (const e of meta.eventos) ev.push({ ...e, t: e.t + HOOK });
-  ev.push(...sonidosCierre(HOOK + meta.dur));
-  const total = HOOK + meta.dur + CIERRE;
+  const mask = mascara(tmp);
+  const ts = momentos(day);
+  const gancho = ts.slice(0, GANCHO.n).map((t, j) => corte(t, GANCHO.dur, path.join(tmp, `g${j}.mp4`), mask));
+  const puente = ts.slice(GANCHO.n).map((t, j) => corte(t, PUENTE.dur, path.join(tmp, `p${j}.mp4`), mask));
+  const parts = [...gancho, seg, ...puente, path.join(ROOT, 'intro', 'cierre-shorts-9x16.mp4')];
   const wav = path.join(tmp, 'sfx.wav');
-  mix(ev, total, wav);
-
+  mezclar(sonidos(), TOTAL, wav);
   const outDir = path.join(ROOT, 'cuenta-atras', 'final');
   fs.mkdirSync(outDir, { recursive: true });
-  const inputs = parts.flatMap(p => ['-i', p]);
   const pre = parts.map((_, i) => `[${i}:v]fps=30,scale=1080:1920,setsar=1,format=yuv420p[v${i}]`).join(';');
   const cat = parts.map((_, i) => `[v${i}]`).join('') + `concat=n=${parts.length}:v=1:a=0[v]`;
-  ff([...inputs, '-i', wav, '-filter_complex', `${pre};${cat}`, '-map', '[v]', '-map', `${parts.length}:a`,
-    '-c:v', 'libx264', '-crf', '19', '-preset', 'medium', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-shortest',
+  ff([...parts.flatMap(p => ['-i', p]), '-i', wav, '-filter_complex', `${pre};${cat}`, '-map', '[v]', '-map', `${parts.length}:a`,
+    '-c:v', 'libx264', '-crf', '19', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '256k', '-t', String(TOTAL),
     '-movflags', '+faststart', path.join(outDir, `cuenta-atras-${name}.mp4`)]);
   fs.rmSync(tmp, { recursive: true });
-  console.log('ok', name, total.toFixed(1) + 's');
+  console.log('ok', name, TOTAL.toFixed(1) + 's');
 }
