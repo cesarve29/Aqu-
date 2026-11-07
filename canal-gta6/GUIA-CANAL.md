@@ -88,7 +88,17 @@ GTA 6, GTA VI, Grand Theft Auto 6, GTA 6 shorts, GTA 6 clips, GTA 6 español, GT
 Específicas según el clip: `GTA 6 fails`, `GTA 6 físicas`, `GTA 6 policía`, `GTA 6 coches`,
 `GTA 6 easter egg`, `Lucia GTA 6`, `Jason GTA 6`, `GTA 6 vs GTA 5`, `GTA 6 online`.
 
-## 7. Miniaturas llamativas — reglas
+## 7. Estructura de cada Short (regla fija)
+
+1. **Segundo 0: el momento más fuerte del clip.** Sin intro ni logo al principio: si no engancha en 1 s, la gente pasa al siguiente.
+2. Texto grande en pantalla los primeros 2–3 s con el gancho (ej. "MIRA LO QUE HACE LA POLICÍA 😱").
+3. Subtítulos grandes durante todo el clip.
+4. **Al final: cierre de 2 s** (`intro/cierre-shorts-9x16.mp4`) con "SUSCRÍBETE @SeisEnVice".
+5. Duración total por debajo de 60 s.
+
+La intro completa con cortes del tráiler se usa solo en vídeos largos o recopilaciones.
+
+## 8. Miniaturas llamativas — reglas
 
 En **Shorts** la miniatura se elige desde la app de YouTube (fotograma del vídeo), así que
 el primer fotograma y el texto en pantalla de los primeros segundos son clave. Para **vídeos
@@ -100,7 +110,7 @@ largos o recopilaciones** usamos la plantilla:
 4. **Cara o reacción** (emoji o tu cara) cuando sea posible: aumenta clics.
 5. No pongas el mismo texto que el título: se complementan.
 
-## 8. Plan de lanzamiento
+## 9. Plan de lanzamiento
 
 | Fecha | Acción |
 |---|---|
@@ -109,7 +119,7 @@ largos o recopilaciones** usamos la plantilla:
 | 19 nov (lanzamiento) | 3–5 Shorts/día: primeras reacciones, primeros minutos, detalles, físicas, fails |
 | Semanas siguientes | 2–3 Shorts/día con lo más viral; repetir los formatos que mejor funcionen según Metricool |
 
-## 9. Ojo con los derechos
+## 10. Ojo con los derechos
 
 - **Gameplay propio**: es lo más seguro. Rockstar históricamente permite vídeos con gameplay.
 - **Clips de otros creadores/streamers**: pide permiso o usa solo los que lo permiten expresamente; si no, pueden tumbar los vídeos con reclamaciones y el canal recibe *strikes*.
