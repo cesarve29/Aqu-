@@ -1,8 +1,8 @@
 # Cuenta atrás GTA 6 — 13 Shorts
 
-Archivos: `final/cuenta-atras-dia-XX.mp4` (1080×1920, 10,2 s). Audio: solo efectos de sonido; añade tu música encima.
+Archivos: `final/cuenta-atras-dia-XX.mp4` (1080×1920, 15 s). Audio: solo efectos de sonido; añade tu música encima.
 
-Estructura de cada Short: 4 cortes rápidos del tráiler (gancho) → número del día con reloj → cierre `SUSCRÍBETE @SeisEnVice`.
+Estructura de cada Short (15 s): 5 cortes del tráiler (gancho) → número del día con reloj → 4 cortes más → cierre `SUSCRÍBETE @SeisEnVice`. Efectos de sonido de la biblioteca `sfx/` (ElevenLabs).
 
 **Etiquetas (todas):** `Seis en Vice, GTA 6, GTA VI, GTA 6 cuenta atrás, GTA 6 fecha de salida, GTA 6 19 noviembre, Grand Theft Auto 6, GTA 6 shorts, Vice City, Leonida, GTA 6 trailer, GTA 6 español`
 
