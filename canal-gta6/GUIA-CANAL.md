@@ -20,7 +20,7 @@ Handle: `@SeisEnVice` (libre en YouTube a 7-nov-2026; regístralo cuanto antes).
 
 | Archivo | Tamaño | Dónde se sube |
 |---|---|---|
-| `banner.png` | 2560×1440 (texto dentro de la zona segura 1546×423) | Personalizar canal → Imagen del banner |
+| `banner.png` / `.jpg` | 2560×1440, texto en la zona segura 1546×423 (generado con `diseno/banner.js`) | Personalizar canal → Imagen del banner |
 | `foto-perfil.png` / `.jpg` | 1920×1920 (generada con `diseno/avatar.js`) | Personalizar canal → Imagen |
 | `miniatura-plantilla.png` | 1280×720 | Ejemplo de estilo para vídeos largos |
 

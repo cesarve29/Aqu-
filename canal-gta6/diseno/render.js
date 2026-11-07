@@ -92,7 +92,8 @@ module.exports = { scene, css, defs, NAME_A, NAME_B, TAG, INITIALS };
 if (require.main === module) (async () => {
   const outDir = path.join(__dirname, '..');
   const browser = await chromium.launch();
-  for (const [name, html, W, H] of [['banner', banner, 2560, 1440], ['foto-perfil', avatar, 800, 800], ['miniatura-plantilla', thumb, 1280, 720]]) {
+  // El banner y la foto de perfil actuales se generan con banner.js y avatar.js
+  for (const [name, html, W, H] of [['miniatura-plantilla', thumb, 1280, 720]]) {
     const p = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
     await p.setContent(html, { waitUntil: 'networkidle' });
     await p.evaluate(() => document.fonts.ready);
