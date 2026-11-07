@@ -4,7 +4,10 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const { chromium } = require('playwright');
 const defs = fs.readFileSync(path.join(__dirname, 'scene.svg.txt'), 'utf8');
-const OUT = 1920, U = 1000; // se diseña en 1000x1000 y se exporta a 1920x1920
+const OUT = 1920, U = 1000;
+// VARIANT=2 -> el 6 gigante de fondo y "Vice" grande superpuesto
+const V2 = process.env.VARIANT === '2';
+const SUFFIX = V2 ? '-v2' : ''; // se diseña en 1000x1000 y se exporta a 1920x1920
 
 function grid(hy) {
   let g = '';
@@ -49,6 +52,13 @@ body{width:${U}px;height:${U}px;position:relative;overflow:hidden;background:#12
 .badge{top:842px}
 .badge span{display:inline-block;font:900 38px Montserrat,sans-serif;letter-spacing:.22em;padding:10px 22px 10px 30px;
   color:#120626;background:#ffe066;border-radius:10px;box-shadow:0 0 22px #ffe06699,0 5px 0 #1a0633}
+${V2 ? `
+.top{top:58px;font-size:52px}
+.six,.shine{top:95px;font-size:830px}
+.six{filter:drop-shadow(0 0 30px #ff3fb4) drop-shadow(0 14px 0 #1a0633);-webkit-text-stroke:14px #1a0633}
+.vice{top:330px;font-size:360px;transform:rotate(-10deg);
+  text-shadow:0 0 4px #fff,0 0 14px #ff3fb4,0 0 32px #ff3fb4,0 0 70px #ff2a8a,0 0 110px #ff2a8a,0 8px 0 #1a0633,0 14px 30px #1a0633}
+.badge{top:850px}` : ''}
 </style></head><body>
 <svg width="${U}" height="${U}" viewBox="0 0 ${U} ${U}" style="position:absolute;inset:0">
   ${defs}
@@ -79,9 +89,9 @@ body{width:${U}px;height:${U}px;position:relative;overflow:hidden;background:#12
   const p = await b.newPage({ viewport: { width: U, height: U }, deviceScaleFactor: OUT / U });
   await p.setContent(html, { waitUntil: 'networkidle' });
   await p.evaluate(() => document.fonts.ready);
-  const png = path.join(__dirname, '..', 'foto-perfil.png');
+  const png = path.join(__dirname, '..', `foto-perfil${SUFFIX}.png`);
   await p.screenshot({ path: png });
   await b.close();
-  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-i', png, '-q:v', '2', path.join(__dirname, '..', 'foto-perfil.jpg')]);
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-i', png, '-q:v', '2', path.join(__dirname, '..', `foto-perfil${SUFFIX}.jpg`)]);
   console.log('ok');
 })();
