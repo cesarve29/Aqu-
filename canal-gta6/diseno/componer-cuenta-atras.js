@@ -3,7 +3,8 @@
 //   4-10 s   número del día con reloj de neón
 //   10-13 s  4 cortes más del tráiler
 //   13-15 s  cierre "SUSCRÍBETE @SeisEnVice"
-// Audio: SOLO efectos de sonido de la biblioteca (../sfx). El audio del tráiler se elimina; la música la pone el usuario.
+// Audio: audio original de cada corte del tráiler + efectos de la biblioteca (../sfx) a volumen moderado.
+// La música la pone el usuario encima.
 // Uso: node componer-cuenta-atras.js <trailer.mp4> [dia ...]
 const fs = require('fs');
 const path = require('path');
@@ -38,6 +39,20 @@ function mascara(tmp) {
   ff(['-f', 'lavfi', '-i', 'color=white:s=1080x1500', '-frames:v', '1', '-vf',
     "format=gray,geq=lum='255*min(1,min(Y/170,(H-1-Y)/170))'", m]);
   return m;
+}
+
+const VOL_SFX = 0.32;   // efectos claramente por debajo del audio de los clips
+const VOL_CLIP = 1.0;
+
+function audioCorte(t, dur, out) {
+  ff(['-ss', String(t), '-t', String(dur), '-i', TRAILER, '-vn', '-af',
+    `aresample=48000,aformat=channel_layouts=stereo,afade=in:st=0:d=0.03,afade=out:st=${(dur - 0.05).toFixed(2)}:d=0.05,apad=whole_dur=${dur}`,
+    '-t', String(dur), '-c:a', 'pcm_s16le', out]);
+  return out;
+}
+function silencio(dur, out) {
+  ff(['-f', 'lavfi', '-i', `anullsrc=r=48000:cl=stereo`, '-t', String(dur), '-c:a', 'pcm_s16le', out]);
+  return out;
 }
 
 function corte(t, dur, out, mask) {
@@ -84,8 +99,19 @@ for (const day of LIST) {
   const gancho = ts.slice(0, GANCHO.n).map((t, j) => corte(t, GANCHO.dur, path.join(tmp, `g${j}.mp4`), mask));
   const puente = ts.slice(GANCHO.n).map((t, j) => corte(t, PUENTE.dur, path.join(tmp, `p${j}.mp4`), mask));
   const parts = [...gancho, seg, ...puente, path.join(ROOT, 'intro', 'cierre-shorts-9x16.mp4')];
-  const wav = path.join(tmp, 'sfx.wav');
-  mezclar(sonidos(), TOTAL, wav);
+  const sfx = path.join(tmp, 'sfx.wav');
+  mezclar(sonidos(), TOTAL, sfx);
+  // pista con el audio original de los cortes (silencio durante la cuenta atrás y el cierre)
+  const pistas = [
+    ...ts.slice(0, GANCHO.n).map((t, j) => audioCorte(t, GANCHO.dur, path.join(tmp, `ag${j}.wav`))),
+    silencio(SEG, path.join(tmp, 's1.wav')),
+    ...ts.slice(GANCHO.n).map((t, j) => audioCorte(t, PUENTE.dur, path.join(tmp, `ap${j}.wav`))),
+    silencio(TOTAL - T_CIERRE, path.join(tmp, 's2.wav'))];
+  const wav = path.join(tmp, 'mezcla.wav');
+  ff([...pistas.flatMap(p => ['-i', p]), '-i', sfx, '-filter_complex',
+    `${pistas.map((_, i) => `[${i}:a]`).join('')}concat=n=${pistas.length}:v=0:a=1,volume=${VOL_CLIP}[clip];` +
+    `[${pistas.length}:a]volume=${VOL_SFX}[fx];[clip][fx]amix=inputs=2:normalize=0,loudnorm=I=-15:TP=-1.5:LRA=11[a]`,
+    '-map', '[a]', '-ar', '48000', '-t', String(TOTAL), wav]);
   const outDir = path.join(ROOT, 'cuenta-atras', 'final');
   fs.mkdirSync(outDir, { recursive: true });
   const pre = parts.map((_, i) => `[${i}:v]fps=30,scale=1080:1920,setsar=1,format=yuv420p[v${i}]`).join(';');

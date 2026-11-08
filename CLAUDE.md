@@ -24,8 +24,9 @@ Guía completa (títulos, descripciones, etiquetas, derechos): `canal-gta6/GUIA-
    ver `canal-gta6/sfx/README.md`). No sintetizar efectos ni generar nuevos si ya existe uno adecuado.
    Mezclar con `canal-gta6/diseno/biblioteca-sfx.js`. Si hace falta un efecto nuevo, generarlo con
    ElevenLabs, añadirlo a la biblioteca y al README.
-8. En los Shorts con material del tráiler: el audio original se elimina; solo efectos de sonido
-   (la música la añade el usuario). Vídeo del tráiler grande, sin bordes de color, fundido con el fondo.
+8. En los Shorts con material del tráiler: MANTENER el audio original de cada corte y poner los
+   efectos de sonido por debajo, a volumen moderado (`VOL_SFX` ≈ 0.3, que no tapen el clip).
+   La música la añade el usuario. Vídeo del tráiler grande, sin bordes de color, fundido con el fondo.
 
 ### Herramientas
 
