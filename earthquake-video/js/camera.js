@@ -142,7 +142,9 @@ export class CameraRig {
     cam.up.set(0, 1, 0);
     cam.lookAt(tgt[0], tgt[1], tgt[2]);
     cam.rotateZ(roll);
-    if (cam.fov !== fov) { cam.fov = fov; cam.updateProjectionMatrix(); }
+    // vertical 9:16 frame: widen the vertical FOV so the horizontal view stays usable
+    const vf = cam.aspect < 1 ? 2 * Math.atan(Math.tan(fov * Math.PI / 360) * 1.5) * 180 / Math.PI : fov;
+    if (cam.fov !== vf) { cam.fov = vf; cam.updateProjectionMatrix(); }
     return true;
   }
 }

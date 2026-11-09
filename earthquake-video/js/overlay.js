@@ -1,6 +1,6 @@
-import { T, NARRATION, smooth, clamp, lerp, groundMotion, shakeEnvelope, rng } from './timeline.js';
+import { T, NARRATION, smooth, clamp, lerp, groundMotion, shakeEnvelope, rng, VIDEO_CUT_TIMES, VIDEO_DURATION, narrationVideo } from './timeline.js';
 
-const W = 1920, H = 1080;
+const W = 1080, H = 1920;
 const ACC = '#ff6a1a';
 const F = (w, s) => `${w} ${s}px Inter, "Inter Display", sans-serif`;
 
@@ -9,7 +9,7 @@ function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w
 
 // Subtitle cues: split each narration segment into its '|' parts, timed by length.
 const CUES = [];
-for (const [start, f0, f1, text] of NARRATION) {
+for (const [start, f0, f1, text] of narrationVideo()) {
   const parts = text.split('|');
   const total = parts.reduce((s, p) => s + p.length, 0);
   let t = start + 0.05;
@@ -31,19 +31,20 @@ export class Overlay {
     this.gm = { x: 0, y: 0, z: 0 };
   }
 
-  fade(t) {
-    // black between shots
-    const cuts = [T.introEnd, T.beachCut, T.hillCut, T.globeCut, T.endingCut];
-    let a = 1 - smooth(0, 1.5, t);
-    for (const c of cuts) a = Math.max(a, 1 - smooth(0, 0.45, Math.abs(t - c)));
-    a = Math.max(a, smooth(140.4, 141.8, t));
+  fade(t, vt) {
+    // black dips at every cut (in video time) plus the hill cut inside the last segment
+    let a = 1 - smooth(0, 1.2, vt);
+    for (const c of VIDEO_CUT_TIMES) a = Math.max(a, 1 - smooth(0, 0.4, Math.abs(vt - c)));
+    a = Math.max(a, 1 - smooth(0, 0.4, Math.abs(t - T.hillCut)));
+    a = Math.max(a, smooth(VIDEO_DURATION - 0.9, VIDEO_DURATION - 0.05, vt));
     return a;
   }
 
-  draw(c, t, frame) {
+  draw(c, t, frame, vt) {
+    this.vt = vt;
     c.save();
     // vignette
-    const vg = c.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.95);
+    const vg = c.createRadialGradient(W / 2, H / 2, W * 0.45, W / 2, H / 2, H * 0.62);
     vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.42)');
     c.fillStyle = vg; c.fillRect(0, 0, W, H);
     // film grain
@@ -64,7 +65,7 @@ export class Overlay {
     this.endCard(c, t);
     this.subs(c, t);
 
-    const f = this.fade(t);
+    const f = this.fade(t, vt);
     if (f > 0.001) { c.fillStyle = `rgba(0,0,0,${f})`; c.fillRect(0, 0, W, H); }
     c.restore();
   }
@@ -74,23 +75,23 @@ export class Overlay {
   }
 
   title(c, t) {
-    const a = win(t, 1.0, 9.0, 1.2, 1.0);
+    const a = win(t, 3.2, 10.0, 1.0, 0.8);
     if (a > 0) {
       c.save(); c.globalAlpha = a; c.textAlign = 'center';
       const sc = 1 + (t - 1) * 0.006;
-      c.translate(W / 2, H * 0.42); c.scale(sc, sc);
-      c.fillStyle = '#fff'; c.font = F(800, 168);
-      c.letterSpacing = '18px';
+      c.translate(W / 2, H * 0.34); c.scale(sc, sc);
+      c.fillStyle = '#fff'; c.font = F(800, 132);
+      c.letterSpacing = '10px';
       this.shadowText(c, 'MAGNITUD 10', 0, 0, 30);
       c.letterSpacing = '0px';
-      c.fillStyle = ACC; c.fillRect(-260 * smooth(1.5, 3, t), 40, 520 * smooth(1.5, 3, t), 8);
-      c.fillStyle = 'rgba(255,255,255,0.92)'; c.font = F(500, 46);
-      c.globalAlpha = a * smooth(2.4, 3.4, t);
+      c.fillStyle = ACC; c.fillRect(-220 * smooth(3.5, 5, t), 40, 440 * smooth(3.5, 5, t), 8);
+      c.fillStyle = 'rgba(255,255,255,0.92)'; c.font = F(500, 44);
+      c.globalAlpha = a * smooth(4.0, 5.0, t);
       this.shadowText(c, '¿Qué pasaría si ocurriera hoy?', 0, 120);
       c.restore();
     }
-    this.lowerThird(c, t, 10.2, 17.4, 'VALDIVIA, CHILE · 22 DE MAYO DE 1960', 'Magnitud 9,5 — el terremoto más fuerte jamás registrado');
-    this.lowerThird(c, t, 104.0, 110.8, 'TSUNAMI', 'Olas de 20 a 30 metros avanzan tierra adentro');
+    this.lowerThird(c, t, 10.4, 17.2, 'VALDIVIA, CHILE · 1960', 'Magnitud 9,5: el mayor registrado');
+    this.lowerThird(c, t, 102.0, 108.4, 'TSUNAMI', 'Olas de 20 a 30 m tierra adentro');
   }
 
   lowerThird(c, t, a0, a1, head, sub) {
@@ -101,12 +102,12 @@ export class Overlay {
     c.font = F(800, 40); const w1 = c.measureText(head).width;
     c.font = F(500, 32); const w2 = c.measureText(sub).width;
     const w = Math.max(w1, w2) + 80;
-    const g = c.createLinearGradient(90, 0, 90 + w, 0);
+    const g = c.createLinearGradient(60, 0, 60 + w, 0);
     g.addColorStop(0, 'rgba(10,14,20,0.82)'); g.addColorStop(1, 'rgba(10,14,20,0.0)');
-    c.fillStyle = g; c.fillRect(90, 740, w, 130);
-    c.fillStyle = ACC; c.fillRect(90, 740, 8, 130);
-    c.fillStyle = '#fff'; c.font = F(800, 40); c.textAlign = 'left'; c.fillText(head, 124, 795);
-    c.fillStyle = 'rgba(255,255,255,0.88)'; c.font = F(500, 32); c.fillText(sub, 124, 845);
+    c.fillStyle = g; c.fillRect(60, 1000, w, 130);
+    c.fillStyle = ACC; c.fillRect(60, 1000, 8, 130);
+    c.fillStyle = '#fff'; c.font = F(800, 40); c.textAlign = 'left'; c.fillText(head, 94, 1055);
+    c.fillStyle = 'rgba(255,255,255,0.88)'; c.font = F(500, 32); c.fillText(sub, 94, 1105);
     c.restore();
   }
 
@@ -172,10 +173,10 @@ export class Overlay {
     c.font = F(800, 46); const w1 = c.measureText(big).width;
     c.font = F(500, 26); const w2 = c.measureText(small).width;
     const w = Math.max(w1, w2) + 70;
-    c.fillStyle = 'rgba(8,11,16,0.75)'; rr(c, 90, 110, w, 128, 16); c.fill();
-    c.fillStyle = color; c.fillRect(90, 110, 8, 128);
-    c.fillStyle = '#fff'; c.font = F(800, 46); c.textAlign = 'left'; c.fillText(big, 122, 166);
-    c.fillStyle = 'rgba(255,255,255,0.85)'; c.font = F(500, 26); c.fillText(small, 122, 210);
+    c.fillStyle = 'rgba(8,11,16,0.75)'; rr(c, 60, 250, w, 128, 16); c.fill();
+    c.fillStyle = color; c.fillRect(60, 250, 8, 128);
+    c.fillStyle = '#fff'; c.font = F(800, 46); c.textAlign = 'left'; c.fillText(big, 92, 306);
+    c.fillStyle = 'rgba(255,255,255,0.85)'; c.font = F(500, 26); c.fillText(small, 92, 350);
     c.restore();
   }
 
@@ -186,12 +187,12 @@ export class Overlay {
     const a = win(t, 89.2, 92.0, 0.5, 0.6);
     if (a > 0) {
       c.save(); c.globalAlpha = a; c.textAlign = 'center'; c.fillStyle = '#fff'; c.font = F(500, 40);
-      this.shadowText(c, 'Minutos después…', W / 2, 160); c.restore();
+      this.shadowText(c, 'Minutos después…', W / 2, 520); c.restore();
     }
   }
 
   seismo(c, t) {
-    const a = win(t, 38.5, 88.6, 0.8, 0.6);
+    const a = win(t, 38.5, 75.6, 0.8, 0.3);
     // keep trace history even when hidden
     if (a <= 0) return;
     this.trace = [];
@@ -200,7 +201,7 @@ export class Overlay {
       groundMotion(tt, this.gm);
       this.trace.push(this.gm.x + this.gm.z * 0.5 + Math.sin(tt * 40) * 0.004);
     }
-    const x = W - 520, y = 90, w = 430, h = 150;
+    const x = W - 470, y = 400, w = 410, h = 140;
     c.save(); c.globalAlpha = a;
     c.fillStyle = 'rgba(245,242,232,0.92)'; rr(c, x, y, w, h, 14); c.fill();
     c.strokeStyle = 'rgba(0,0,0,0.12)'; c.lineWidth = 1;
@@ -227,7 +228,7 @@ export class Overlay {
     c.save();
     items.forEach(([txt, ic], i) => {
       const k = smooth(65.0 + i * 0.7, 65.5 + i * 0.7, t) * a;
-      const bx = W / 2 - 560 + i * 330, by = 150;
+      const bx = W / 2 - 480 + i * 330, by = 600;
       c.globalAlpha = k;
       c.fillStyle = 'rgba(8,11,16,0.78)'; rr(c, bx, by - (1 - k) * 20, 300, 110, 18); c.fill();
       c.fillStyle = ACC; rr(c, bx, by - (1 - k) * 20, 300, 8, 4); c.fill();
@@ -237,16 +238,16 @@ export class Overlay {
   }
 
   timer(c, t) {
-    const a = win(t, 70.6, 76.4, 0.4, 0.6);
+    const a = win(t, 70.4, 75.6, 0.4, 0.3);
     if (a <= 0) return;
-    const k = smooth(71.2, 75.6, t);
+    const k = smooth(71.0, 75.0, t);
     const secs = Math.floor(Math.pow(k, 1.6) * 1200);
     const mm = String(Math.floor(secs / 60)).padStart(2, '0'), ss = String(secs % 60).padStart(2, '0');
     c.save(); c.globalAlpha = a;
-    c.fillStyle = 'rgba(8,11,16,0.78)'; rr(c, W / 2 - 250, 130, 500, 170, 20); c.fill();
-    c.fillStyle = 'rgba(255,255,255,0.8)'; c.font = F(600, 24); c.textAlign = 'center'; c.fillText('DURACIÓN DEL TEMBLOR', W / 2, 175);
-    c.fillStyle = '#fff'; c.font = F(800, 92); c.fillText(`${mm}:${ss}`, W / 2, 270);
-    c.fillStyle = 'rgba(255,255,255,0.55)'; c.font = F(500, 20); c.fillText('Un sismo típico: 30 s – 2 min', W / 2, 330 - 8);
+    c.fillStyle = 'rgba(8,11,16,0.78)'; rr(c, W / 2 - 260, 600, 520, 210, 20); c.fill();
+    c.fillStyle = 'rgba(255,255,255,0.8)'; c.font = F(600, 26); c.textAlign = 'center'; c.fillText('DURACIÓN DEL TEMBLOR', W / 2, 648);
+    c.fillStyle = '#fff'; c.font = F(800, 96); c.fillText(`${mm}:${ss}`, W / 2, 748);
+    c.fillStyle = 'rgba(255,255,255,0.6)'; c.font = F(500, 22); c.fillText('Un sismo típico: 30 s – 2 min', W / 2, 790);
     c.restore();
   }
 
@@ -255,9 +256,10 @@ export class Overlay {
     if (a <= 0) return;
     const blink = 0.75 + 0.25 * Math.sin(t * 10);
     c.save(); c.globalAlpha = a;
-    c.fillStyle = `rgba(200,16,24,${0.88 * blink})`; c.fillRect(0, 96, W, 112);
-    c.fillStyle = '#fff'; c.textAlign = 'center'; c.font = F(800, 50);
-    c.fillText('⚠  ALERTA DE TSUNAMI  ·  EVACÚA A ZONA ALTA  ⚠', W / 2, 170);
+    c.fillStyle = `rgba(200,16,24,${0.88 * blink})`; c.fillRect(0, 250, W, 180);
+    c.fillStyle = '#fff'; c.textAlign = 'center'; c.font = F(800, 56);
+    c.fillText('⚠  ALERTA DE TSUNAMI  ⚠', W / 2, 330);
+    c.font = F(700, 40); c.fillText('EVACÚA A ZONA ALTA', W / 2, 395);
     c.restore();
   }
 
@@ -300,27 +302,37 @@ export class Overlay {
   }
 
   endCard(c, t) {
-    const a = smooth(T.endCard, T.endCard + 1.2, t);
+    const a = smooth(VIDEO_DURATION - 3.2, VIDEO_DURATION - 2.2, this.vt);
     if (a <= 0) return;
     c.save();
     c.fillStyle = `rgba(0,0,0,${0.62 * a})`; c.fillRect(0, 0, W, H);
     c.globalAlpha = a; c.textAlign = 'center'; c.fillStyle = '#fff';
-    c.font = F(800, 120); c.letterSpacing = '14px'; c.fillText('MAGNITUD 10', W / 2, H / 2 - 20); c.letterSpacing = '0px';
-    c.fillStyle = ACC; c.fillRect(W / 2 - 200, H / 2 + 20, 400, 6);
-    c.fillStyle = 'rgba(255,255,255,0.9)'; c.font = F(500, 40); c.fillText('Infórmate. Prepárate. Protégete.', W / 2, H / 2 + 100);
+    c.font = F(800, 116); c.letterSpacing = '8px'; c.fillText('MAGNITUD 10', W / 2, H / 2 - 40); c.letterSpacing = '0px';
+    c.fillStyle = ACC; c.fillRect(W / 2 - 200, H / 2 + 5, 400, 6);
+    c.fillStyle = 'rgba(255,255,255,0.92)'; c.font = F(600, 44); c.fillText('Infórmate. Prepárate.', W / 2, H / 2 + 90);
+    c.fillText('Protégete.', W / 2, H / 2 + 150);
     c.restore();
   }
 
   subs(c, t) {
-    if (t > T.endCard) return;
+    if (this.vt > VIDEO_DURATION - 3.2) return;
+    const vt = this.vt;
     for (const [a0, a1, txt] of CUES) {
-      if (t < a0 - 0.1 || t > a1 + 0.25) continue;
-      const a = win(t, a0 - 0.1, a1 + 0.25, 0.15, 0.2);
+      if (vt < a0 - 0.1 || vt > a1 + 0.25) continue;
+      const a = win(vt, a0 - 0.1, a1 + 0.25, 0.15, 0.2);
       c.save(); c.globalAlpha = a;
-      c.font = F(600, 40); c.textAlign = 'center';
-      const w = c.measureText(txt).width + 48;
-      c.fillStyle = 'rgba(0,0,0,0.55)'; rr(c, W / 2 - w / 2, H - 150, w, 64, 12); c.fill();
-      c.fillStyle = '#fff'; c.fillText(txt, W / 2, H - 104);
+      c.font = F(700, 50); c.textAlign = 'center';
+      // greedy wrap to ~900 px
+      const words = txt.split(' '); const lines = []; let cur = '';
+      for (const wd of words) { const tryL = cur ? cur + ' ' + wd : wd; if (c.measureText(tryL).width > 900 && cur) { lines.push(cur); cur = wd; } else cur = tryL; }
+      if (cur) lines.push(cur);
+      const lh = 66, base = H - 470 - (lines.length - 1) * lh;
+      lines.forEach((ln, i) => {
+        const w = c.measureText(ln).width + 40;
+        c.fillStyle = 'rgba(0,0,0,0.6)'; rr(c, W / 2 - w / 2, base + i * lh - 50, w, 64, 12); c.fill();
+      });
+      c.fillStyle = '#fff';
+      lines.forEach((ln, i) => c.fillText(ln, W / 2, base + i * lh));
       c.restore();
     }
   }

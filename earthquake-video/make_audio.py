@@ -342,37 +342,70 @@ sting = lp(brown(n), 90) * np.exp(-tt * 0.8) * smooth(0, 0.02, tt)
 place(mus, sting, 1.0, 0.6, 0)
 place(mus, sting, T['endCard'], 0.5, 0)
 
-# ---------------------------------------------------------------- narration
+# ---------------------------------------------------------------- vertical edit
+CUTS = [tuple(map(float, m)) for m in re.findall(r"\[([\d.]+), ([\d.]+)\]", src.split('export const CUTS = ')[1].split(';')[0])]
+xf = int(0.12 * SR)
+pieces = []
+for a, b in CUTS:
+    seg_fx = fx[int(a * SR):int(b * SR)].copy()
+    seg_mu = mus[int(a * SR):int(b * SR)].copy()
+    ramp = np.linspace(0, 1, xf)[:, None]
+    for x in (seg_fx, seg_mu):
+        x[:xf] *= ramp; x[-xf:] *= ramp[::-1]
+    pieces.append((seg_fx, seg_mu))
+FX = np.concatenate([p[0] for p in pieces])
+MU = np.concatenate([p[1] for p in pieces])
+NV = len(FX)
+tv = np.arange(NV) / SR
+
+
+def video_time_of(st):
+    acc = 0.0
+    for a, b in CUTS:
+        if a <= st < b:
+            return acc + st - a
+        acc += b - a
+    return None
+
+
+# ---------------------------------------------------------------- narration (video time)
 sr_n, nar = wavfile.read('audio/narration.wav')
 nar = nar.astype(np.float64) / 32768.0
 if nar.ndim > 1:
     nar = nar.mean(axis=1)
 assert sr_n == SR
-voice = np.zeros(N)
-for (vt, f0, f1) in NARR:
+voice = np.zeros(NV)
+for (st, f0, f1) in NARR:
+    vt = video_time_of(st)
+    if vt is None:
+        continue
     a, b = int((f0 - 0.08) * SR), int((f1 + 0.3) * SR)
     seg = nar[max(0, a):b].copy()
     ramp = int(0.03 * SR)
     seg[:ramp] *= np.linspace(0, 1, ramp)
     seg[-ramp:] *= np.linspace(1, 0, ramp)
     i = int((vt - 0.08) * SR)
-    voice[i:i + len(seg)] += seg[: N - i]
-# ducking envelope from voice activity
-act = np.abs(voice)
-act = lp(act, 3)
+    n = min(len(seg), NV - i)
+    voice[i:i + n] += seg[:n]
+# end-card stinger
+n = int(4 * SR)
+tt = np.arange(n) / SR
+sting = lp(brown(n), 90) * np.exp(-tt * 0.8) * smooth(0, 0.02, tt)
+i = int((NV / SR - 3.2) * SR)
+MU[i:i + n, 0] += sting[:NV - i] * 0.5
+MU[i:i + n, 1] += sting[:NV - i] * 0.5
+
+act = lp(np.abs(voice), 3)
 act = np.clip(act / (act.max() * 0.25), 0, 1)
 duck = 1 - 0.5 * act
-
-mix = fx * duck[:, None] * 1.0 + mus * (1 - 0.35 * act)[:, None]
-# gentle bus compression
+mix = FX * duck[:, None] + MU * (1 - 0.35 * act)[:, None]
 peak = np.abs(mix).max()
 mix = np.tanh(mix / (peak * 0.6)) * 0.55
 vo = voice / np.abs(voice).max() * 0.9
 mix[:, 0] += vo
 mix[:, 1] += vo
 mix /= np.abs(mix).max() / 0.97
-# fade in/out
-fade = smooth(0, 0.8, t) * (1 - smooth(DUR - 2.2, DUR - 0.1, t))
+fade = smooth(0, 0.6, tv) * (1 - smooth(NV / SR - 1.2, NV / SR - 0.05, tv))
 mix *= fade[:, None]
-wavfile.write('audio/soundtrack.wav', SR, (mix * 32767).astype(np.int16))
-print('ok', mix.shape, NARR[:2])
+wavfile.write('audio/soundtrack_vertical.wav', SR, (mix * 32767).astype(np.int16))
+print('ok', NV / SR, 's', CUTS)

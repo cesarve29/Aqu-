@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
-import { FPS, T, smooth, lerp, clamp, groundMotion } from './timeline.js';
+import { FPS, T, smooth, lerp, clamp, groundMotion, storyTime } from './timeline.js';
 import { City } from './city.js';
 import { Crowd } from './people.js';
 import { FX } from './fx.js';
@@ -8,7 +8,7 @@ import { CameraRig, Phone, shotAt } from './camera.js';
 import { Globe } from './globe.js';
 import { Overlay } from './overlay.js';
 
-const W = 1920, H = 1080;
+const W = 1080, H = 1920;
 const params = new URLSearchParams(location.search);
 const scale = parseFloat(params.get('scale') || '1');
 
@@ -103,7 +103,7 @@ function step(f) {
 }
 
 window.prof = { r: 0, c: 0, o: 0, e: 0, s: 0 };
-function render(f) {
+function render(f, vt) {
   const t = f / FPS;
   const isGlobe = t >= T.globeCut && t < T.endingCut;
   let a = performance.now();
@@ -113,18 +113,22 @@ function render(f) {
   let b = performance.now(); window.prof.r += b - a; a = b;
   octx.drawImage(renderer.domElement, 0, 0, W, H);
   b = performance.now(); window.prof.c += b - a; a = b;
-  overlay.draw(octx, t, f);
+  overlay.draw(octx, t, f, vt);
   b = performance.now(); window.prof.o += b - a;
 }
 
 window.ready = true;
 window.advanceTo = (f) => { const a = performance.now(); while (frame < f) { frame++; step(frame); } window.prof.s += performance.now() - a; return frame; };
-window.renderFrame = (f, quality = 0.93) => {
+// f = output (video) frame; mapped onto the story timeline
+window.renderFrame = (vf, quality = 0.93) => {
+  const vt = vf / FPS;
+  const f = Math.round(storyTime(vt) * FPS);
   window.advanceTo(f);
-  render(f);
+  render(f, vt);
   const a = performance.now();
   const u = out.toDataURL('image/jpeg', quality);
   window.prof.e += performance.now() - a;
   return u;
 };
+window.storyFrame = (vf) => storyTime(vf / FPS) * FPS;
 window.stats = () => renderer.info.render;
