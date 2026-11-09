@@ -1,6 +1,6 @@
 # Cuenta atrás GTA 6 — 13 Shorts
 
-Archivos: `final/cuenta-atras-dia-XX.mp4` (1080×1920; días 12-10: 15 s, desde el día 9: 16 s). Audio: solo efectos de sonido; añade tu música encima.
+Archivos: `final/cuenta-atras-dia-XX.mp4` (1080×1920; días 12-10: 15 s, desde el día 9: 16 s). Audio: sonido original de los cortes + efectos suaves; añade tu música encima.
 
 Estructura (días 12-10): 5 cortes rápidos (0,8 s) → número del día → 4 cortes → cierre. **Desde el día 9:** 3 cortes largos (1,6 s) → número del día → 2 cortes largos → cierre. Audio original de los cortes + efectos de `sfx/` por debajo.
 
