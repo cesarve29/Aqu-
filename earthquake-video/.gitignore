@@ -4,3 +4,7 @@ frames/
 audio/narr_a.mp3
 parts/
 parts_h/
+pipeline.log
+finalize_v.log
+render_h.log
+parts_pipeline.sh
