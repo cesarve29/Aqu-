@@ -114,7 +114,7 @@ function render(f, vt) {
   let b = performance.now(); window.prof.r += b - a; a = b;
   octx.drawImage(renderer.domElement, 0, 0, W, H);
   b = performance.now(); window.prof.c += b - a; a = b;
-  overlay.draw(octx, t, f, vt);
+  if (!params.has('clean')) overlay.draw(octx, t, f, vt);
   b = performance.now(); window.prof.o += b - a;
 }
 
