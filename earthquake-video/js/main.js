@@ -1,14 +1,15 @@
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
-import { FPS, T, smooth, lerp, clamp, groundMotion, storyTime } from './timeline.js';
+import { FPS, T, smooth, lerp, clamp, groundMotion, storyTime, H_MODE } from './timeline.js';
 import { City } from './city.js';
 import { Crowd } from './people.js';
 import { FX } from './fx.js';
 import { CameraRig, Phone, shotAt } from './camera.js';
 import { Globe } from './globe.js';
 import { Overlay } from './overlay.js';
+import { Overlay as OverlayH } from './overlay_h.js';
 
-const W = 1080, H = 1920;
+const W = H_MODE ? 1920 : 1080, H = H_MODE ? 1080 : 1920;
 const params = new URLSearchParams(location.search);
 const scale = parseFloat(params.get('scale') || '1');
 
@@ -62,7 +63,7 @@ const fx = new FX(scene, envRT.texture);
 const rig = new CameraRig(camera);
 const phone = new Phone(camera);
 const globe = new Globe(W / H);
-const overlay = new Overlay();
+const overlay = H_MODE ? new OverlayH() : new Overlay();
 
 const out = document.createElement('canvas');
 out.width = W; out.height = H;

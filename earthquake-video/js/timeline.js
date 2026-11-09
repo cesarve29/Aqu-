@@ -1,10 +1,13 @@
 // Global timeline (seconds of video). Everything in the film is a pure
 // function of these constants plus a deterministic simulation stepped at FPS.
-export const FPS = 60;          // simulation & output frame rate
+// mode=h (query string) renders the full horizontal 16:9 cut at 30 fps; default is vertical 9:16 at 60 fps
+export const H_MODE = typeof location !== 'undefined' && location.search.includes('mode=h');
+export const FPS = H_MODE ? 30 : 60; // simulation & output frame rate
 export const DURATION = 142;    // full story length (s)
 
 // Vertical cut (~1:14): story-time ranges played back to back.
-export const CUTS = [[3.0, 17.4], [37.2, 75.4], [89.2, 97.8], [101.0, 111.2]];
+const CUTS_V = [[3.0, 17.4], [37.2, 75.4], [89.2, 97.8], [101.0, 111.2]];
+export const CUTS = H_MODE ? [[0, 142]] : CUTS_V;
 export const VIDEO_DURATION = CUTS.reduce((s, [a, b]) => s + b - a, 0);
 export const VIDEO_CUT_TIMES = CUTS.slice(1).map((_, i) => CUTS.slice(0, i + 1).reduce((s, [a, b]) => s + b - a, 0));
 // video time at which a story instant is shown (null if it was cut out)

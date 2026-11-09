@@ -343,7 +343,7 @@ place(mus, sting, 1.0, 0.6, 0)
 place(mus, sting, T['endCard'], 0.5, 0)
 
 # ---------------------------------------------------------------- vertical edit
-CUTS = [tuple(map(float, m)) for m in re.findall(r"\[([\d.]+), ([\d.]+)\]", src.split('export const CUTS = ')[1].split(';')[0])]
+CUTS = [tuple(map(float, m)) for m in re.findall(r"\[([\d.]+), ([\d.]+)\]", src.split('const CUTS_V = ')[1].split(';')[0])]
 xf = int(0.12 * SR)
 pieces = []
 for a, b in CUTS:

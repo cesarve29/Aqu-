@@ -2,7 +2,7 @@
 const { chromium } = require('playwright');
 const http = require('http'); const fs = require('fs'); const path = require('path');
 const [outDir, ...frames] = process.argv.slice(2);
-const query = process.env.Q || '';
+const query = (process.env.Q || '') + (process.env.MODE === 'h' ? '&mode=h' : '');
 const root = __dirname;
 const server = http.createServer((req, res) => {
   const p = path.join(root, decodeURIComponent(req.url.split('?')[0]));
@@ -12,7 +12,7 @@ const server = http.createServer((req, res) => {
 (async () => {
   await new Promise(r => server.listen(0, r));
   const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-  const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
+  const page = await browser.newPage({ viewport: process.env.MODE === 'h' ? { width: 1920, height: 1080 } : { width: 1080, height: 1920 } });
   page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') console.error('[page]', m.text()); });
   page.on('pageerror', e => console.error('[pageerror]', e));
   await page.goto(`http://localhost:${server.address().port}/index.html?${query}`);

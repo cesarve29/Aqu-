@@ -22,14 +22,14 @@ const server = http.createServer((req, res) => {
   await new Promise(r => server.listen(0, r));
   const port = server.address().port;
   const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-  const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
+  const page = await browser.newPage({ viewport: process.env.MODE === 'h' ? { width: 1920, height: 1080 } : { width: 1080, height: 1920 } });
   page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') console.error('[page]', m.text()); });
   page.on('pageerror', e => console.error('[pageerror]', e));
-  await page.goto(`http://localhost:${port}/index.html?scale=${scale}`);
+  await page.goto(`http://localhost:${port}/index.html?scale=${scale}${process.env.MODE === 'h' ? '&mode=h' : ''}`);
   await page.waitForFunction(() => window.ready === true, null, { timeout: 300000 });
   let ff = null;
   if (outFile.endsWith('.mp4')) {
-    ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', '60', '-c:v', 'mjpeg', '-i', '-',
+    ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', process.env.MODE === 'h' ? '30' : '60', '-c:v', 'mjpeg', '-i', '-',
       '-c:v', 'libx264', '-preset', 'medium', '-crf', '17', '-pix_fmt', 'yuv420p', outFile], { stdio: ['pipe', 'inherit', 'inherit'] });
   } else fs.mkdirSync(outFile, { recursive: true });
   const t0 = Date.now();
