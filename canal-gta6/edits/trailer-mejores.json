@@ -1,0 +1,17 @@
+{
+  "salida": "trailer-mejores.mp4",
+  "titulo": ["ASÍ SE VE", "GTA 6 😳"],
+  "transicion": 0.3,
+  "clips": [
+    { "t": 1221.6, "dur": 3.2, "texto": "" },
+    { "t": 1124.4, "dur": 3.0, "texto": "EXPLOSIONES 💥" },
+    { "t": 721.0,  "dur": 3.0, "texto": "ATRACOS 💰" },
+    { "t": 1085.5, "dur": 3.0, "texto": "MOTOS 🏍️" },
+    { "t": 1042.3, "dur": 2.6, "texto": "PLAYAS DE LEONIDA 🌴" },
+    { "t": 1274.5, "dur": 3.0, "texto": "VIDA NOCTURNA 🪩" },
+    { "t": 1115.2, "dur": 3.0, "texto": "OFF-ROAD 🔥" },
+    { "t": 993.0,  "dur": 3.0, "texto": "UN MAPA ENORME 🗺️" },
+    { "t": 467.8,  "dur": 2.8, "texto": "FAUNA SALVAJE 🦌" },
+    { "t": 1063.0, "dur": 3.4, "texto": "19 DE NOVIEMBRE 📅" }
+  ]
+}
