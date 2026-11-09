@@ -8,3 +8,5 @@ pipeline.log
 finalize_v.log
 render_h.log
 parts_pipeline.sh
+*_hq.mp4
+video_*_tmp.mp4
