@@ -1,0 +1,5 @@
+node_modules/
+frames/
+*.part.mp4
+audio/narr_a.mp3
+parts/

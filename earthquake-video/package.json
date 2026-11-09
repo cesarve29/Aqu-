@@ -1,0 +1,6 @@
+{
+  "name": "earthquake-video",
+  "private": true,
+  "description": "Magnitude-10 earthquake first-person 3D explainer video",
+  "dependencies": { "three": "0.170.0" }
+}
