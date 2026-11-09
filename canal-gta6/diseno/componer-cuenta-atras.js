@@ -1,8 +1,8 @@
-// Monta cada Short de la cuenta atrás (15 s, vertical 1080x1920):
-//   0-4 s    gancho: 5 cortes del tráiler (lo más fuerte primero)
-//   4-10 s   número del día con reloj de neón
-//   10-13 s  4 cortes más del tráiler
-//   13-15 s  cierre "SUSCRÍBETE @SeisEnVice"
+// Monta cada Short de la cuenta atrás (16 s, vertical 1080x1920):
+//   0-4,8 s     gancho: 3 cortes de 1,6 s del tráiler (lo más fuerte primero)
+//   4,8-10,8 s  número del día con reloj de neón
+//   10,8-14 s   2 cortes más de 1,6 s
+//   14-16 s     cierre "SUSCRÍBETE @SeisEnVice"
 // Audio: audio original de cada corte del tráiler + efectos de la biblioteca (../sfx) a volumen moderado.
 // La música la pone el usuario encima.
 // Uso: node componer-cuenta-atras.js <trailer.mp4> [dia ...]
@@ -16,20 +16,41 @@ const TRAILER = process.argv[2];
 const DAYS = process.argv.slice(3).map(Number);
 const LIST = DAYS.length ? DAYS : [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
 const ROOT = path.join(__dirname, '..');
-const GANCHO = { n: 5, dur: 0.8 }, PUENTE = { n: 4, dur: 0.75 };
-const T_CUENTA = GANCHO.n * GANCHO.dur, SEG = 6.0, T_PUENTE = T_CUENTA + SEG, T_CIERRE = T_PUENTE + PUENTE.n * PUENTE.dur, TOTAL = T_CIERRE + 2.0;
+// Formato por día: hasta el día 10, cortes rápidos (0,8 s); desde el día 9, cortes largos (1,6 s) y transiciones suaves
+const FORMATOS = {
+  rapido: { gancho: { n: 5, dur: 0.8 }, puente: { n: 4, dur: 0.75 }, zoom: 0.12, entrada: 'fade=in:st=0:d=0.06:color=white' },
+  largo: { gancho: { n: 3, dur: 1.6 }, puente: { n: 2, dur: 1.6 }, zoom: 0.06, entrada: 'fade=in:st=0:d=0.12:color=black' },
+};
+let GANCHO, PUENTE, T_CUENTA, T_PUENTE, T_CIERRE, TOTAL, POR_DIA, F;
+const SEG = 6.0;
+function usarFormato(day) {
+  F = day >= 10 ? FORMATOS.rapido : FORMATOS.largo;
+  GANCHO = F.gancho; PUENTE = F.puente;
+  T_CUENTA = GANCHO.n * GANCHO.dur; T_PUENTE = T_CUENTA + SEG; T_CIERRE = T_PUENTE + PUENTE.n * PUENTE.dur; TOTAL = T_CIERRE + 2.0;
+  POR_DIA = GANCHO.n + PUENTE.n;
+}
 // Momentos elegidos del tráiler (segundo de inicio), ordenados por impacto
 const MOMENTOS = [1223.1, 1126.1, 721.6, 1567.8, 1086.7, 1065.0, 1043.0, 1275.6, 543.5, 1116.5, 832.8, 1045.5, 1082.0, 524.0,
   992.2, 1569.0, 1236.3, 1433.0, 769.4, 371.3, 1030.5, 1553.0, 568.0, 1028.0, 552.2, 1109.3, 719.4, 1160.5, 1073.5, 732.3,
   593.4, 468.1, 1144.2, 1050.4, 711.4, 1068.0, 545.0, 1573.9, 800.0, 1151.0, 1172.3, 950.1, 570.0, 1210.0];
-const POR_DIA = GANCHO.n + PUENTE.n;
 const ff = (args) => execFileSync('ffmpeg', ['-nostdin', '-y', '-loglevel', 'error', ...args]);
 
+// Cambios de plano del tráiler (detectados con ffmpeg scdet) para que ningún corte cruce un cambio de cámara
+const PLANOS = JSON.parse(fs.readFileSync(path.join(__dirname, 'cambios-de-plano.json')));
+function encajar(t, dur) {
+  let a = 0, b = Infinity;
+  for (const c of PLANOS) { if (c <= t) a = c; else { b = c; break; } }
+  if (t + dur > b - 0.05) t = Math.max(a + 0.05, b - 0.05 - dur);
+  return Math.round(t * 100) / 100;
+}
 function momentos(day) {
   const k = 12 - day;
   return Array.from({ length: POR_DIA }, (_, j) => {
-    const i = k * POR_DIA + j;
-    return MOMENTOS[i % MOMENTOS.length] + Math.floor(i / MOMENTOS.length) * 1.3; // en otra vuelta, otro instante del plano
+    // formato largo: continúa después de los 27 momentos usados en los días 12-10
+    const i = day >= 10 ? k * POR_DIA + j : 27 + (9 - day) * POR_DIA + j;
+    const t = MOMENTOS[i % MOMENTOS.length] + Math.floor(i / MOMENTOS.length) * 1.3; // en otra vuelta, otro instante del plano
+    if (day >= 10) return t; // formato rápido: igual que los vídeos ya entregados
+    return encajar(t, j < GANCHO.n ? GANCHO.dur : PUENTE.dur);
   });
 }
 
@@ -59,9 +80,9 @@ function corte(t, dur, out, mask) {
   ff(['-ss', String(t), '-t', String(dur), '-i', TRAILER, '-loop', '1', '-i', mask, '-an', '-filter_complex',
     `[0:v]fps=30,eq=saturation=1.3:contrast=1.06,colorbalance=rs=.06:bs=.08,split[a][b];` +
     `[a]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:2,eq=brightness=-0.12[bg];` +
-    `[b]scale=2667:1500,zoompan=z='1.12-0.12*min(on/${Math.round(dur * 30)},1)':d=1:s=2667x1500:fps=30,crop=1080:1500,format=rgba[fg0];` +
+    `[b]scale=2667:1500,zoompan=z='${1 + F.zoom}-${F.zoom}*min(on/${Math.round(dur * 30)},1)':d=1:s=2667x1500:fps=30,crop=1080:1500,format=rgba[fg0];` +
     `[1:v]format=gray,scale=1080:1500[m];[fg0][m]alphamerge[fg];` +
-    `[bg][fg]overlay=0:210:shortest=1,fade=in:st=0:d=0.06:color=white,setsar=1,format=yuv420p[v]`,
+    `[bg][fg]overlay=0:210:shortest=1,${F.entrada},setsar=1,format=yuv420p[v]`,
     '-map', '[v]', '-t', String(dur), '-c:v', 'libx264', '-crf', '17', '-r', '30', out]);
   return out;
 }
@@ -91,6 +112,7 @@ function sonidos() {
 }
 
 for (const day of LIST) {
+  usarFormato(day);
   const name = `dia-${String(day).padStart(2, '0')}`;
   const seg = path.join(ROOT, 'cuenta-atras', 'segmentos', `${name}.mp4`);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'comp-'));
