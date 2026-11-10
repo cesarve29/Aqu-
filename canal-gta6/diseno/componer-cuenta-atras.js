@@ -1,8 +1,9 @@
-// Monta cada Short de la cuenta atrás (16 s, vertical 1080x1920):
-//   0-4,8 s     gancho: 3 cortes de 1,6 s del tráiler (lo más fuerte primero)
-//   4,8-10,8 s  número del día con reloj de neón
-//   10,8-14 s   2 cortes más de 1,6 s
-//   14-16 s     cierre "SUSCRÍBETE @SeisEnVice"
+// Monta cada Short de la cuenta atrás (vertical). Formato según el día (ver FORMATOS).
+// Desde el día 8 (extendido, ~21 s, 1440x2560):
+//   0-6,6 s      gancho: 3 cortes de 2,2 s del tráiler (lo más fuerte primero)
+//   6,6-12,6 s   número del día con reloj de neón
+//   12,6-19,2 s  3 cortes más de 2,2 s
+//   19,2-21,2 s  cierre "SUSCRÍBETE @SeisEnVice"
 // Audio: audio original de cada corte del tráiler + efectos de la biblioteca (../sfx) a volumen moderado.
 // La música la pone el usuario encima.
 // Uso: node componer-cuenta-atras.js <trailer.mp4> [dia ...]
@@ -20,11 +21,21 @@ const ROOT = path.join(__dirname, '..');
 const FORMATOS = {
   rapido: { gancho: { n: 5, dur: 0.8 }, puente: { n: 4, dur: 0.75 }, zoom: 0.12, entrada: 'fade=in:st=0:d=0.06:color=white' },
   largo: { gancho: { n: 3, dur: 1.6 }, puente: { n: 2, dur: 1.6 }, zoom: 0.06, entrada: 'fade=in:st=0:d=0.12:color=black' },
+  // desde el día 8: cortes de 2,2 s, momentos nunca publicados y salida 1440x2560 (YouTube le da más calidad)
+  extendido: { gancho: { n: 3, dur: 2.2 }, puente: { n: 3, dur: 2.2 }, zoom: 0.05, entrada: 'fade=in:st=0:d=0.15:color=black', hq: true },
 };
-let GANCHO, PUENTE, T_CUENTA, T_PUENTE, T_CIERRE, TOTAL, POR_DIA, F;
+// Momentos nuevos (no usados en días 12-9 ni en el edit "trailer-mejores"; ver ../edits/usados.json).
+// Cada uno verificado: 2,2 s dentro del mismo plano. Los 3 primeros de cada día son el gancho.
+const NUEVOS = {
+  8: [964.0, 777.0, 1245.0, 944.0, 1280.8, 921.0],
+  7: [846.0, 1208.0, 1093.0, 1374.6, 751.0, 380.0],
+  6: [870.0, 687.8, 216.0, 1261.0, 983.0, 1020.0],
+};
+let GANCHO, PUENTE, T_CUENTA, T_PUENTE, T_CIERRE, TOTAL, POR_DIA, F, W, H, BAND;
 const SEG = 6.0;
 function usarFormato(day) {
-  F = day >= 10 ? FORMATOS.rapido : FORMATOS.largo;
+  F = day >= 10 ? FORMATOS.rapido : day === 9 ? FORMATOS.largo : FORMATOS.extendido;
+  W = F.hq ? 1440 : 1080; H = F.hq ? 2560 : 1920; BAND = Math.round(1500 * W / 1080);
   GANCHO = F.gancho; PUENTE = F.puente;
   T_CUENTA = GANCHO.n * GANCHO.dur; T_PUENTE = T_CUENTA + SEG; T_CIERRE = T_PUENTE + PUENTE.n * PUENTE.dur; TOTAL = T_CIERRE + 2.0;
   POR_DIA = GANCHO.n + PUENTE.n;
@@ -44,6 +55,10 @@ function encajar(t, dur) {
   return Math.round(t * 100) / 100;
 }
 function momentos(day) {
+  if (F.hq) {
+    if (!NUEVOS[day]) throw new Error(`Faltan momentos nuevos para el día ${day} en NUEVOS`);
+    return NUEVOS[day];
+  }
   const k = 12 - day;
   return Array.from({ length: POR_DIA }, (_, j) => {
     // formato largo: continúa después de los 27 momentos usados en los días 12-10
@@ -57,8 +72,9 @@ function momentos(day) {
 // Máscara con bordes difuminados para fundir el vídeo con el fondo (sin líneas)
 function mascara(tmp) {
   const m = path.join(tmp, 'mask.png');
-  ff(['-f', 'lavfi', '-i', 'color=white:s=1080x1500', '-frames:v', '1', '-vf',
-    "format=gray,geq=lum='255*min(1,min(Y/170,(H-1-Y)/170))'", m]);
+  const f = Math.round(170 * W / 1080);
+  ff(['-f', 'lavfi', '-i', `color=white:s=${W}x${BAND}`, '-frames:v', '1', '-vf',
+    `format=gray,geq=lum='255*min(1,min(Y/${f},(H-1-Y)/${f}))'`, m]);
   return m;
 }
 
@@ -76,7 +92,23 @@ function silencio(dur, out) {
   return out;
 }
 
+function corteHQ(t, dur, out, mask) {
+  // limpieza de compresión + escalado lanczos con zoom suave por fotograma + enfoque
+  const Z = `(${1 + F.zoom}-${F.zoom}*min(t/${dur},1))`;
+  const sw = Math.round(1280 * BAND / 720 / 2) * 2;
+  ff(['-ss', String(t), '-t', String(dur), '-i', TRAILER, '-loop', '1', '-i', mask, '-an', '-filter_complex',
+    `[0:v]fps=30,hqdn3d=2:1.5:4:3,eq=saturation=1.22:contrast=1.05,colorbalance=rs=.05:bs=.07,split[a][b];` +
+    `[a]scale=${W / 4}:${H / 4}:force_original_aspect_ratio=increase,crop=${W / 4}:${H / 4},boxblur=8:2,scale=${W}:${H},eq=brightness=-0.12[bg];` +
+    `[b]scale=w='trunc(${sw}*${Z}/2)*2':h='trunc(${BAND}*${Z}/2)*2':eval=frame:flags=lanczos,crop=${W}:${BAND},` +
+    `unsharp=5:5:0.8:5:5:0,format=rgba[fg0];` +
+    `[1:v]format=gray,scale=${W}:${BAND}[m];[fg0][m]alphamerge[fg];` +
+    `[bg][fg]overlay=0:${Math.round(210 * W / 1080)}:shortest=1,${F.entrada},setsar=1,format=yuv420p[v]`,
+    '-map', '[v]', '-t', String(dur), '-c:v', 'libx264', '-crf', '14', '-preset', 'slow', '-r', '30', out]);
+  return out;
+}
+
 function corte(t, dur, out, mask) {
+  if (F.hq) return corteHQ(t, dur, out, mask);
   ff(['-ss', String(t), '-t', String(dur), '-i', TRAILER, '-loop', '1', '-i', mask, '-an', '-filter_complex',
     `[0:v]fps=30,eq=saturation=1.3:contrast=1.06,colorbalance=rs=.06:bs=.08,split[a][b];` +
     `[a]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:2,eq=brightness=-0.12[bg];` +
@@ -136,10 +168,10 @@ for (const day of LIST) {
     '-map', '[a]', '-ar', '48000', '-t', String(TOTAL), wav]);
   const outDir = path.join(ROOT, 'cuenta-atras', 'final');
   fs.mkdirSync(outDir, { recursive: true });
-  const pre = parts.map((_, i) => `[${i}:v]fps=30,scale=1080:1920,setsar=1,format=yuv420p[v${i}]`).join(';');
+  const pre = parts.map((_, i) => `[${i}:v]fps=30,scale=${W}:${H}:flags=lanczos,setsar=1,format=yuv420p[v${i}]`).join(';');
   const cat = parts.map((_, i) => `[v${i}]`).join('') + `concat=n=${parts.length}:v=1:a=0[v]`;
   ff([...parts.flatMap(p => ['-i', p]), '-i', wav, '-filter_complex', `${pre};${cat}`, '-map', '[v]', '-map', `${parts.length}:a`,
-    '-c:v', 'libx264', '-crf', '19', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '256k', '-t', String(TOTAL),
+    '-c:v', 'libx264', '-crf', F.hq ? '16' : '19', ...(F.hq ? ['-preset', 'slow', '-profile:v', 'high'] : []), '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '256k', '-t', String(TOTAL),
     '-movflags', '+faststart', path.join(outDir, `cuenta-atras-${name}.mp4`)]);
   fs.rmSync(tmp, { recursive: true });
   console.log('ok', name, TOTAL.toFixed(1) + 's');

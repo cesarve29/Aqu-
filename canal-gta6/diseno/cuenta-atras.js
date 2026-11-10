@@ -1,5 +1,5 @@
 // Segmentos animados de la cuenta atrás (vertical 1080x1920, sin audio).
-// Uso: node cuenta-atras.js [dia ...]   (por defecto 12..0; 0 = "HOY")
+// Uso: node cuenta-atras.js [dia ...]   (por defecto 12..0; 0 = "HOY"). Desde el día 8 se renderiza a 1440x2560.
 // Salida: ../cuenta-atras/segmentos/dia-XX.mp4  (+ eventos de sonido en dia-XX.json)
 const fs = require('fs');
 const path = require('path');
@@ -109,7 +109,7 @@ async function render(day, browser) {
   const out = path.join(__dirname, '..', 'cuenta-atras', 'segmentos');
   fs.mkdirSync(out, { recursive: true });
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ca-'));
-  const p = await browser.newPage({ viewport: { width: W, height: H } });
+  const p = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: day <= 8 ? 4 / 3 : 1 }); // desde el día 8: 1440x2560
   const n = Math.round(DUR * FPS);
   for (let i = 0; i < n; i++) {
     await p.setContent(frame(day, i / FPS), { waitUntil: i === 0 ? 'networkidle' : 'load' });
