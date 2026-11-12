@@ -10,8 +10,8 @@
 
 #define NX 64
 #define NY 128
-#define NZ 256
-#define IDX(x, y, z) (((((x) & 63) * NY) + (y)) * NZ + ((z) & 255))
+#define NZ 128
+#define IDX(x, y, z) (((((x) & 63) * NY) + (y)) * NZ + ((z) & 127))
 #define FPS 60.0f
 #define MAXD 300.0f
 #define PXS 0.059375f // character pixel size (32 px = 1.9 blocks)
@@ -34,7 +34,9 @@ static inline uint32_t h3(int x, int y, int z) { return hsh((uint32_t)x * 738560
 static inline float hf(uint32_t h) { return (h & 0xffffff) / 16777216.0f; }
 
 // ---------------------------------------------------------------- world
-enum { AIR = 0, ASPHALT, SIDEWALK, WALL, WIN_DARK, WIN_LIT, NEON, SIGN, METAL, ROADLINE, HOLO };
+enum { AIR = 0, ASPHALT, SIDEWALK, WALL, WIN_DARK, WIN_LIT, NEON, SIGN, METAL, ROADLINE, HOLO, TUNNEL, TNEON };
+#define LOOPT 24.0f
+#define TWO_PI 6.2831853f
 static uint8_t *M, *C, *B;
 static float *Lv, *Fv;
 
@@ -67,8 +69,8 @@ static inline int getm(int x, int y, int z) { if (y < 0) return WALL; if (y >= N
 
 #define ROAD0 27
 #define ROAD1 38 // road x in [27,38), center 32.5
-#define CR0 59
-#define CR1 69 // cross road z in [59,69)
+#define CR0 91
+#define CR1 101
 
 static void build_world(void) {
     // ground
@@ -76,21 +78,21 @@ static void build_world(void) {
         int inMain = x >= ROAD0 && x < ROAD1, inCross = z >= CR0 && z < CR1;
         int m = WALL, c = 3;
         if (inMain || inCross) { m = ASPHALT; c = 0; }
-        else if ((x >= 24 && x < 41) || (z >= 56 && z < 72)) { m = SIDEWALK; c = 0; }
-        if (inMain && !(z >= 56 && z < 72)) {
+        else if ((x >= 24 && x < 41) || (z >= 88 && z < 104)) { m = SIDEWALK; c = 0; }
+        if (inMain && !(z >= 88 && z < 104)) {
             if (x == 32 && (z & 7) < 5) { m = ROADLINE; c = 1; }
             if (x == 28 || x == 36) { m = ROADLINE; c = 0; }
         }
-        if (inMain && ((z >= 56 && z < 59) || (z >= 69 && z < 72)) && (x & 1)) { m = ROADLINE; c = 8 | 0x80; }
-        if (inCross && !inMain && z == 64 && (x & 7) < 5) { m = ROADLINE; c = 3 | 0x40; }
+        if (inMain && ((z >= 88 && z < 91) || (z >= 101 && z < 104)) && (x & 1)) { m = ROADLINE; c = 8 | 0x80; }
+        if (inCross && !inMain && z == 96 && (x & 7) < 5) { m = ROADLINE; c = 3 | 0x40; }
         setv(x, 0, z, m, c);
     }
     // buildings
     for (int side = 0; side < 2; side++) {
-        int z = 72;
-        while (z < 312) {
+        int z = 104;
+        while (z < 216) {
             int w = 12 + rnd() % 11;
-            if (312 - (z + w) < 12) w = 312 - z;
+            if (216 - (z + w) < 12) w = 216 - z;
             int gap = (rnd() % 3 == 0) ? 2 : 0;
             int zs = z, ze = z + w - gap;
             int r = rnd() % 100, H;
@@ -124,7 +126,7 @@ static void build_world(void) {
             lots[id][0] = side; lots[id][1] = zs; lots[id][2] = ze; lots[id][3] = side == 0 ? x0 : x1 - 1; lots[id][4] = H1; lots[id][5] = H;
             z += w;
             // ---- props are added after the facade pass; remember via second loop below
-            if (z >= 312) {
+            if (z >= 216) {
                 if (side == 1) {
                     // facade pass
                     for (int x = 0; x < NX; x++) for (int y = 1; y < NY - 1; y++) for (int zz = 0; zz < NZ; zz++) {
@@ -174,9 +176,22 @@ static void build_world(void) {
             }
         }
     }
+    // neon tunnel across the street, z in [0,40)
+    for (int z = 0; z < 40; z++) for (int x = 24; x < 41; x++) for (int y = 1; y < 14; y++) {
+        int inside = x >= 27 && x <= 37 && y <= 7 && !((y == 7 && (x <= 28 || x >= 36)) || (y == 6 && (x == 27 || x == 37)));
+        if (inside) { setv(x, y, z, AIR, 0); continue; }
+        int m = TUNNEL, c = 0;
+        if (z % 4 == 1) { m = TNEON; c = (z / 4) % 3; }
+        if (z == 0 || z == 39) {
+            if (x >= 26 && x <= 38 && y <= 8) { m = NEON; c = 1; }
+            else if (y >= 10 && y <= 12 && x >= 27 && x <= 37) { m = HOLO; c = 0; }
+            else if (y == 13) { m = NEON; c = 0; }
+        }
+        setv(x, y, z, m, c);
+    }
     // street lamps
     for (int z = 4; z < NZ; z += 16) {
-        if (z > 50 && z < 78) continue;
+        if (z < 46 || (z > 84 && z < 108)) continue;
         for (int s = 0; s < 2; s++) {
             int x = s ? 39 : 25, d = s ? -1 : 1;
             for (int y = 1; y <= 6; y++) setv(x, y, z, METAL, 0);
@@ -185,8 +200,8 @@ static void build_world(void) {
         }
     }
     // sky bridges
-    static const int bz[4] = {8, 112, 152, 214};
-    for (int k = 0; k < 4; k++) {
+    static const int bz[2] = {62, 114};
+    for (int k = 0; k < 2; k++) {
         int z0 = bz[k], nc = k & 1;
         for (int x = 20; x < 46; x++) for (int dz = 0; dz < 4; dz++) for (int y = 13; y < 17; y++) {
             if (getm(x, y, z0 + dz)) continue;
@@ -205,6 +220,7 @@ static inline v3 emisOf(int m, int c, int x, int y, int z) {
     case NEON: return mul(PAL[c], 4.0f);
     case SIGN: return mul(PAL[c], 1.4f);
     case HOLO: return mul(PAL[c], 1.1f);
+    case TNEON: return mul(PAL[c], 1.5f);
     case ROADLINE: return mul(PAL[c & 15], (c & 0x80) ? 0.5f : 0.45f);
     }
     return V(0, 0, 0);
@@ -286,9 +302,9 @@ static float tanHalf;
 
 static void setup_frame(int f) {
     float t = f / FPS; gTime = t;
-    float speed = 3.0f, z = 33.0f + speed * t;
-    float ph = 2.0f * 3.14159265f * 1.55f * t;
-    float sw = 0.72f * sinf(ph), bob = 0.035f * fabsf(cosf(ph));
+    float speed = NZ / LOOPT, z = 20.0f + speed * t;
+    float ph = TWO_PI * (60.0f / LOOPT) * t;
+    float sw = 0.85f * sinf(ph), bob = 0.035f * fabsf(cosf(ph));
     chPos = V(32.5f, 1.0f + bob, z);
     float px = PXS;
     #define SETO(i, P, pvx, pvy, ang, x0, y0, z0, x1, y1, z1) \
@@ -306,24 +322,24 @@ static void setup_frame(int f) {
     for (int i = 0; i < NCAR; i++) {
         uint32_t h = hsh(i * 7919 + 13);
         float lane = 29.0f + (h % 4) * 2.3f, y = 19.0f + ((h >> 4) % 9) * 5.5f;
-        float sp = (10.0f + ((h >> 8) % 12)) * (((h >> 12) & 1) ? 1.0f : -1.0f);
-        float zz = fmodf(((h >> 13) % 256) + sp * t, 256.0f); if (zz < 0) zz += 256.0f;
+        float sp = (NZ / LOOPT) * (2 + ((h >> 8) % 3)) * (((h >> 12) & 1) ? 1.0f : -1.0f);
+        float zz = fmodf(((h >> 13) % NZ) + sp * t, (float)NZ); if (zz < 0) zz += NZ;
         cars[i].p = V(lane, y, zz); cars[i].half = V(0.7f, 0.3f, 1.5f); cars[i].col = (h >> 20) % 8;
         if (i >= NCAR - 3) { // cross street traffic (fly along x)
+            sp = (64.0f / LOOPT) * (4 + ((h >> 8) % 4)) * (((h >> 12) & 1) ? 1.0f : -1.0f);
             float xx = fmodf(((h >> 13) % 64) + sp * t, 64.0f); if (xx < 0) xx += 64.0f;
-            cars[i].p = V(xx, 16.0f + (i - (NCAR - 3)) * 7.0f, 62.0f + (h % 5)); cars[i].half = V(1.5f, 0.3f, 0.7f);
+            cars[i].p = V(xx, 16.0f + (i - (NCAR - 3)) * 7.0f, 94.0f + (h % 4)); cars[i].half = V(1.5f, 0.3f, 0.7f);
         }
     }
-    // camera: orbit from front-quarter view to chase view
-    float T = 12.0f;
-    float u = smooth((t - 0.6f) / (T - 2.2f));
-    float phi = (150.0f + (-14.0f - 150.0f) * u) * 3.14159265f / 180.0f;
-    float R = 4.3f + 1.1f * u + 0.5f * sinf(u * 3.14159f);
-    float hgt = 0.75f + 1.5f * u - 0.5f * sinf(u * 3.14159f);
+    // camera: chase view through the tunnel, one full orbit in the open city (periodic over LOOPT)
+    float q = clampf((t - 5.0f) / 12.0f, 0, 1); q = q * q * q * (q * (q * 6 - 15) + 10);
+    float phi = TWO_PI * q, u = 0.5f + 0.5f * cosf(phi); // u=1 behind, 0 in front
+    float R = 4.3f + 0.9f * u;
+    float hgt = 0.8f + 1.1f * u;
     v3 base = V(32.5f, 1.0f, z);
     camPos = add(base, V(R * sinf(phi), hgt, -R * cosf(phi)));
-    camPos.x += 0.03f * sinf(t * 2.1f); camPos.y += 0.025f * sinf(t * 3.1f + 1.0f);
-    v3 tgt = add(base, V(0, 2.55f + 0.45f * u, 0.6f * u * 4.0f));
+    camPos.x += 0.03f * sinf(TWO_PI * t * 8.0f / LOOPT); camPos.y += 0.025f * sinf(TWO_PI * t * 11.0f / LOOPT + 1.0f);
+    v3 tgt = add(base, V(0, 2.55f + 0.45f * u, 2.4f * u));
     camF = norm(sub(tgt, camPos));
     camR = norm(cross(V(0, 1, 0), camF));
     camU = cross(camF, camR);
@@ -368,8 +384,8 @@ static void hit_dyn(v3 o, v3 d, float *tb, DynHit *dh) {
     // cars
     for (int i = 0; i < NCAR; i++) for (int im = -1; im <= 1; im++) {
         v3 p = cars[i].p;
-        if (i >= NCAR - 3) { p.x += im * 64.0f; p.z += 256.0f * floorf((o.z - p.z) / 256.0f + 0.5f); }
-        else { p.z += im * 256.0f; p.x += 64.0f * floorf((o.x - p.x) / 64.0f + 0.5f); }
+        if (i >= NCAR - 3) { p.x += im * 64.0f; p.z += NZ * floorf((o.z - p.z) / NZ + 0.5f); }
+        else { p.z += im * (float)NZ; p.x += 64.0f * floorf((o.x - p.x) / 64.0f + 0.5f); }
         v3 lo = sub(o, p);
         float t0 = 0, t1 = *tb; int ax = -1, sg = 0, ok = 1;
         const float *po = &lo.x, *pd = &d.x, *hfz = &cars[i].half.x;
@@ -395,7 +411,7 @@ static void char_tex(const DynHit *h, v3 *alb, v3 *emi) {
     v3 base = mul(V(0.05f, 0.055f, 0.075f), 0.8f + 0.5f * n);
     v3 plate = mul(V(0.17f, 0.18f, 0.23f), 0.85f + 0.3f * n);
     v3 a = base, e = V(0, 0, 0);
-    float pulse = 0.75f + 0.25f * sinf(gTime * 5.0f);
+    float pulse = 0.75f + 0.25f * sinf(gTime * TWO_PI * 0.75f);
     switch (h->part) {
     case P_HEAD:
         a = plate;
@@ -465,8 +481,8 @@ static void char_tex(const DynHit *h, v3 *alb, v3 *emi) {
 static inline float vnoise(float x, float z) { // tiling value noise (lattice 16 x 64)
     float fx = floorf(x), fz = floorf(z); int ix = (int)fx, iz = (int)fz;
     float ux = x - fx, uz = z - fz; ux = ux * ux * (3 - 2 * ux); uz = uz * uz * (3 - 2 * uz);
-    float a = hf(h3(ix & 15, 7, iz & 63)), b = hf(h3((ix + 1) & 15, 7, iz & 63));
-    float c = hf(h3(ix & 15, 7, (iz + 1) & 63)), d = hf(h3((ix + 1) & 15, 7, (iz + 1) & 63));
+    float a = hf(h3(ix & 15, 7, iz & 31)), b = hf(h3((ix + 1) & 15, 7, iz & 31));
+    float c = hf(h3(ix & 15, 7, (iz + 1) & 31)), d = hf(h3((ix + 1) & 15, 7, (iz + 1) & 31));
     return (a + (b - a) * ux) * (1 - uz) + (c + (d - c) * ux) * uz;
 }
 
@@ -566,14 +582,26 @@ static v3 shade_voxel(int m, int c, int ix, int iy, int iz, int axis, int sgn, v
         if (gx >= 1 && gx <= 6 && gy >= 1 && gy <= 6 && hf(h3(gx + ix * 9, gy + iy * 9, iz + 77)) < 0.5f) emi = mul(PAL[c], 4.2f * fl);
         if (tu == 0 || tu == 15) emi = mul(PAL[(c + 1) & 7], 1.8f * fl);
         break; }
+    case TUNNEL: {
+        alb = V(0.03f, 0.035f, 0.05f);
+        if (tu == 0 || tv == 0) alb = V(0.07f, 0.07f, 0.09f);
+        else { F0 = 0.10f; rough = 0.0f; rw = 1.0f; n.x += (hf(hb) - 0.5f) * 0.04f; n.y += (hf(hb >> 8) - 0.5f) * 0.04f; n.z += (hf(hb >> 4) - 0.5f) * 0.04f; }
+        break; }
+    case TNEON: {
+        float wv = 0.5f + 0.5f * sinf(TWO_PI * (iz / 16.0f - gTime * 1.5f)); wv *= wv;
+        float core = (axis == 2) ? 1.0f : ((axis == 0 ? tu : tv) >= 5 && (axis == 0 ? tu : tv) <= 10 ? 1.0f : 0.0f);
+        float k = (axis == 2) ? 1.0f : ((axis == 0 ? tu : tv) >= 3 && (axis == 0 ? tu : tv) <= 12 ? 1.0f : 0.05f);
+        emi = mul(add(mul(PAL[c], 1.6f + 3.4f * wv), mul(V(1, 1, 1), (0.3f + 1.6f * wv) * core)), k);
+        alb = V(0.04f, 0.04f, 0.05f);
+        break; }
     case HOLO: {
         float wu = (axis == 0) ? pos.z : pos.x;
         int gx = (int)floorf(wu * 4), gy = (int)floorf(pos.y * 4);
         int band = gy / 6;
         uint32_t bh = hsh(band * 911 + c * 3);
-        int off = (int)floorf(gTime * (3.0f + (bh & 7)) * ((bh & 8) ? 1 : -1));
+        int off = (int)floorf(gTime * 2.0f * (1 + (bh & 3))) * ((bh & 8) ? 1 : -1);
         int gxs = gx + off;
-        int on = (gy % 6) != 5 && ((gxs % 6 + 6) % 6) != 5 && hf(h3(gxs, gy, band)) < 0.5f;
+        int on = (gy % 6) != 5 && ((gxs % 6 + 6) % 6) != 5 && hf(h3(((gxs % 48) + 48) % 48, gy, band)) < 0.5f;
         int pc = ((bh >> 5) & 3) == 0 ? (c + 1) & 7 : c;
         float scan = 0.75f + 0.25f * (((int)floorf(pos.y * 16)) & 1);
         float sweep = 0.8f + 0.4f * smooth(1.0f - fabsf(fmodf(pos.y * 0.15f - gTime * 0.5f, 1.0f) - 0.5f) * 6.0f);
@@ -694,17 +722,18 @@ static inline v3 bil(const float *s, int w, int h, float u, float v) {
 static inline float aces(float x) { float a = 2.51f, b = 0.03f, c = 2.43f, d = 0.59f, e = 0.14f; x = (x * (a * x + b)) / (x * (c * x + d) + e); return clampf(x, 0, 1); }
 
 static void draw_rain(float *img, const float *dep, int W, int H) {
-    const float BOX = 26.0f; const int N = 3600;
+    const float BOX = 32.0f; const int N = 3600;
     for (int i = 0; i < N; i++) {
         uint32_t h = hsh(i * 2654435761u + 99);
         float bx = hf(h) * BOX, bz = hf(hsh(h + 1)) * BOX, by = hf(hsh(h + 2)) * BOX;
-        float sp = 19.0f + 6.0f * hf(hsh(h + 3));
+        float sp = (BOX / LOOPT) * (14 + (hsh(h + 3) % 5));
         by = fmodf(by - gTime * sp, BOX); if (by < 0) by += BOX;
         v3 p;
         p.x = camPos.x + fmodf(bx - camPos.x + 1000 * BOX, BOX) - BOX * 0.5f;
         p.z = camPos.z + fmodf(bz - camPos.z + 1000 * BOX, BOX) - BOX * 0.5f;
         p.y = camPos.y + fmodf(by - camPos.y + 1000 * BOX, BOX) - BOX * 0.4f;
         if (p.y < 1.0f) continue;
+        { int cov = 0, cx = (int)floorf(p.x), cz = (int)floorf(p.z); for (int yy = (int)p.y + 1; yy < (int)p.y + 16 && yy < NY; yy++) if (M[IDX(cx, yy, cz)]) { cov = 1; break; } if (cov) continue; }
         v3 q = add(p, V(0.03f, 0.75f, 0.0f));
         v3 a = sub(p, camPos), b = sub(q, camPos);
         float za = dot(a, camF), zb = dot(b, camF);
