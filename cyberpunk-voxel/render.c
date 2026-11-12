@@ -500,6 +500,7 @@ static v3 trace(v3 o, v3 d, int depth, float *tOut);
 static v3 shade_voxel(int m, int c, int ix, int iy, int iz, int axis, int sgn, v3 pos, v3 d, float t, int depth) {
     v3 n = V(0, 0, 0); (&n.x)[axis] = (float)sgn;
     float fx = clampf(pos.x - ix, 0, 0.9999f), fy = clampf(pos.y - iy, 0, 0.9999f), fz = clampf(pos.z - iz, 0, 0.9999f);
+    ix &= 63; iz &= 127; // hash on wrapped cell so every repeat of the world is identical
     int tu, tv;
     if (axis == 0) { tu = (int)(fz * 16); tv = (int)(fy * 16); }
     else if (axis == 1) { tu = (int)(fx * 16); tv = (int)(fz * 16); }
@@ -596,7 +597,7 @@ static v3 shade_voxel(int m, int c, int ix, int iy, int iz, int axis, int sgn, v
         break; }
     case HOLO: {
         float wu = (axis == 0) ? pos.z : pos.x;
-        int gx = (int)floorf(wu * 4), gy = (int)floorf(pos.y * 4);
+        int gx = (((int)floorf(wu * 4)) % 512 + 512) % 512, gy = (int)floorf(pos.y * 4);
         int band = gy / 6;
         uint32_t bh = hsh(band * 911 + c * 3);
         int off = (int)floorf(gTime * 2.0f * (1 + (bh & 3))) * ((bh & 8) ? 1 : -1);
