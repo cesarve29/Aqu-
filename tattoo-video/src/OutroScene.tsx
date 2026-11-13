@@ -62,7 +62,7 @@ export const OutroScene: React.FC = () => {
           perspective: 1400,
           alignItems: "center",
           justifyContent: "center",
-          paddingBottom: 420,
+          paddingBottom: 760,
         }}
       >
         <div
@@ -76,7 +76,7 @@ export const OutroScene: React.FC = () => {
           }}
         >
           <LogoCoin
-            size={560}
+            size={470}
             rotateY={land + Math.sin(frame / 16) * 16}
             rotateX={Math.cos(frame / 21) * 7}
           />
@@ -84,7 +84,7 @@ export const OutroScene: React.FC = () => {
       </AbsoluteFill>
 
       <AbsoluteFill
-        style={{ alignItems: "center", justifyContent: "flex-end", paddingBottom: 300 }}
+        style={{ alignItems: "center", justifyContent: "flex-end", paddingBottom: 230 }}
       >
         <Interactive.Div
           name="Call to action"
@@ -110,16 +110,16 @@ export const OutroScene: React.FC = () => {
           AGENDA TU CITA
         </Interactive.Div>
         <Interactive.Div
-          name="Sign-off"
+          name="Instagram"
           style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 24,
             fontFamily: body,
             fontWeight: 700,
-            fontSize: 44,
+            fontSize: 54,
             color: "#f2ede4",
-            backgroundColor: "#c1121f",
-            padding: "16px 40px",
-            marginTop: 40,
-            letterSpacing: 4,
+            marginTop: 50,
             opacity: interpolate(frame, [58, 72], [0, 1], {
               extrapolateLeft: "clamp",
               extrapolateRight: "clamp",
@@ -131,7 +131,42 @@ export const OutroScene: React.FC = () => {
             }),
           }}
         >
-          TINTA QUE CUENTA HISTORIAS
+          <svg width="68" height="68" viewBox="0 0 24 24" fill="none" stroke="#f2ede4" strokeWidth="2">
+            <rect x="3" y="3" width="18" height="18" rx="5" />
+            <circle cx="12" cy="12" r="4.2" />
+            <circle cx="17.3" cy="6.7" r="1" fill="#f2ede4" stroke="none" />
+          </svg>
+          @diegoerojastattoo
+        </Interactive.Div>
+        <Interactive.Div
+          name="Phone"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 24,
+            fontFamily: body,
+            fontWeight: 700,
+            fontSize: 62,
+            color: "#f2ede4",
+            backgroundColor: "#c1121f",
+            padding: "18px 44px",
+            marginTop: 36,
+            letterSpacing: 3,
+            opacity: interpolate(frame, [68, 82], [0, 1], {
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+            }),
+            translate: interpolate(frame, [68, 86], ["0px 40px", "0px 0px"], {
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+              easing: Easing.bezier(0.16, 1, 0.3, 1),
+            }),
+          }}
+        >
+          <svg width="58" height="58" viewBox="0 0 24 24" fill="#f2ede4">
+            <path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1L6.6 10.8z" />
+          </svg>
+          312 494 0807
         </Interactive.Div>
       </AbsoluteFill>
       <Atmosphere />

@@ -13,7 +13,7 @@ import { BLOOD, BONE, INK, PIECES, Piece, body, display } from "./theme";
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 export const SLIDE = 50;
-export const FEATURED = [0, 2, 4, 1, 3].map((i) => PIECES[i]);
+export const FEATURED = [0, 2, 9, 4, 1, 3].map((i) => PIECES[i]);
 
 const Slide: React.FC<{ piece: Piece; index: number }> = ({ piece, index }) => {
   const frame = useCurrentFrame();

@@ -11,7 +11,7 @@ import { BONE, PIECES, body, display } from "./theme";
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 const STEP = 20; // frames each piece holds the front spot
-const R = 980;
+const R = 1090;
 const CARD_W = 620;
 const CARD_H = 940;
 

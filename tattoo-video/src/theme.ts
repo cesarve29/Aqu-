@@ -19,8 +19,9 @@ export const PIECES: Piece[] = [
   { file: "koi.jpg", style: "Oriental", w: 785, h: 1400 },
   { file: "lilies.jpg", style: "Floral", w: 720, h: 1280 },
   { file: "chest.jpg", style: "Black & Grey", w: 1400, h: 788 },
-  { file: "dragon.jpg", style: "Realismo", w: 1120, h: 1400 },
+  { file: "dragon.jpg", style: "Fantasía", w: 1120, h: 1400 },
   { file: "botanical.jpg", style: "Botánico", w: 787, h: 1400 },
   { file: "ornamental.jpg", style: "Blackwork", w: 1400, h: 1400 },
   { file: "scorpion.jpg", style: "Tradicional", w: 787, h: 1400 },
+  { file: "anime.jpg", style: "Anime", w: 1120, h: 1400 },
 ];
