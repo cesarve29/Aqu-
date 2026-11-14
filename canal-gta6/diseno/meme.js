@@ -1,6 +1,7 @@
 // Meme vertical partido (1440x2560): arriba una toma del tráiler (cámara lenta en ida y vuelta), abajo otro vídeo.
-// Uso: node meme.js <trailer.mp4> <video_abajo.mp4> <config.json>
-// Audio: el del vídeo de abajo. Sin intro; termina con el cierre del canal.
+// Uso: node meme.js <trailer.mp4> <video_abajo.mp4|-> <config.json>
+//   Si "abajo" tiene { t, dur } en la config, la parte de abajo también sale del tráiler (pasa "-" como vídeo).
+// Audio: el del vídeo de abajo, o el de la toma indicada en "audio" (en bucle). Sin intro; termina con el cierre.
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -15,7 +16,7 @@ const W = 1440, H = 2560;
 // Distribución: texto 1 (220) + panel de arriba (860) | texto 2 (200) + panel de abajo (1280, más grande para el vídeo)
 const T1 = 220, P1 = 860, T2 = 200, Y2 = T1 + P1, P2 = H - Y2 - T2;
 const ff = (args) => execFileSync('ffmpeg', ['-nostdin', '-y', '-loglevel', 'error', ...args]);
-const dur = parseFloat(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', ABAJO]).toString());
+const dur = cfg.duracion || parseFloat(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', ABAJO]).toString());
 
 async function overlay(file) {
   const b = await chromium.launch();
@@ -39,28 +40,43 @@ async function overlay(file) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'meme-'));
   const png = path.join(tmp, 'txt.png');
   await overlay(png);
-  const A = cfg.arriba;
-  // arriba: cámara lenta + ida y vuelta, repetido hasta cubrir la duración
-  const ida = path.join(tmp, 'ida.mp4');
-  ff(['-ss', String(A.t), '-t', String(A.dur), '-i', TRAILER, '-an', '-vf',
-    `crop=836:720:${A.recorte_x}:0,hqdn3d=2:1.5:4:3,setpts=PTS/${A.velocidad},minterpolate=fps=30:mi_mode=blend,` +
-    `scale=${W}:-2:flags=lanczos,unsharp=5:5:0.7,eq=saturation=1.15`, '-c:v', 'libx264', '-crf', '14', ida]);
-  const vuelta = path.join(tmp, 'vuelta.mp4');
-  ff(['-i', ida, '-vf', 'reverse', '-c:v', 'libx264', '-crf', '14', vuelta]);
-  const lista = path.join(tmp, 'l.txt');
-  fs.writeFileSync(lista, Array.from({ length: 6 }, (_, i) => `file '${i % 2 ? vuelta : ida}'`).join('\n'));
-  const top = path.join(tmp, 'top.mp4');
-  ff(['-f', 'concat', '-safe', '0', '-i', lista, '-t', String(dur), '-c:v', 'libx264', '-crf', '14', top]);
+  // toma del tráiler: cámara lenta + ida y vuelta, repetida hasta cubrir la duración
+  const toma = (T, nombre) => {
+    const ida = path.join(tmp, `${nombre}-ida.mp4`), vuelta = path.join(tmp, `${nombre}-vuelta.mp4`);
+    const [rx, rw] = T.recorte || [T.recorte_x ?? 0, 836];
+    ff(['-ss', String(T.t), '-t', String(T.dur), '-i', TRAILER, '-an', '-vf',
+      `crop=${rw}:720:${rx}:0,hqdn3d=2:1.5:4:3,setpts=PTS/${T.velocidad || 1},minterpolate=fps=30:mi_mode=blend,` +
+      `scale=${W}:-2:flags=lanczos,unsharp=5:5:0.7,eq=saturation=1.15`, '-c:v', 'libx264', '-crf', '14', ida]);
+    ff(['-i', ida, '-vf', 'reverse', '-c:v', 'libx264', '-crf', '14', vuelta]);
+    const lista = path.join(tmp, `${nombre}.txt`);
+    fs.writeFileSync(lista, Array.from({ length: 12 }, (_, i) => `file '${i % 2 ? vuelta : ida}'`).join('\n'));
+    const out = path.join(tmp, `${nombre}.mp4`);
+    ff(['-f', 'concat', '-safe', '0', '-i', lista, '-t', String(dur), '-c:v', 'libx264', '-crf', '14', out]);
+    return out;
+  };
+  const top = toma(cfg.arriba, 'arriba');
+  let abajo = ABAJO;
+  if (cfg.abajo.t !== undefined) {
+    // vídeo de abajo sacado del tráiler + audio de la toma indicada (en bucle)
+    const v = toma(cfg.abajo, 'abajo');
+    const au = cfg.audio || cfg.abajo;
+    abajo = path.join(tmp, 'abajo-con-audio.mp4');
+    ff(['-i', v, '-ss', String(au.t), '-t', String(au.dur), '-i', TRAILER, '-filter_complex',
+      `[1:a]aresample=48000,aformat=channel_layouts=stereo,afade=in:d=0.05,afade=out:st=${au.dur - 0.15}:d=0.15,aloop=loop=20:size=${Math.round(au.dur * 48000)},atrim=0:${dur}[a]`,
+      '-map', '0:v', '-map', '[a]', '-t', String(dur), '-c:v', 'copy', '-c:a', 'pcm_s16le', abajo]);
+  }
 
   const cuerpo = path.join(tmp, 'cuerpo.mp4');
-  ff(['-i', top, '-i', ABAJO, '-loop', '1', '-i', png, '-filter_complex',
+  ff(['-i', top, '-i', abajo, '-loop', '1', '-i', png, '-filter_complex',
     // panel de arriba: Lucía recortada al panel; fondo morado de marca
     `color=c=0x120626:s=${W}x${H}:r=30:d=${dur}[base];` +
     `[0:v]scale=${W}:${P1}:force_original_aspect_ratio=increase,crop=${W}:${P1}[t];` +
     // panel de abajo: vídeo completo en el centro con fondo desenfocado a los lados
     // panel de abajo: vídeo ampliado a 1100 px de ancho (recortando un poco de los pies), fondo desenfocado a los lados
     `[1:v]fps=30,split[x][y];[x]scale=${W}:${P2}:force_original_aspect_ratio=increase,crop=${W}:${P2},boxblur=30:2,eq=brightness=-0.15[bb];` +
-    `[y]scale=1100:-2:flags=lanczos,crop=1100:${P2}:0:110,unsharp=5:5:0.5[bf];[bb][bf]overlay=(W-w)/2:0[b];` +
+    (cfg.abajo.t !== undefined
+      ? `[y]scale=${W}:${P2}:force_original_aspect_ratio=increase,crop=${W}:${P2}[bf];[bb][bf]overlay=0:0[b];`
+      : `[y]scale=1100:-2:flags=lanczos,crop=1100:${P2}:0:110,unsharp=5:5:0.5[bf];[bb][bf]overlay=(W-w)/2:0[b];`) +
     `[base][t]overlay=0:${T1}[s1];[s1][b]overlay=0:${Y2 + T2}[s2];[s2][2:v]overlay=0:0:shortest=1,format=yuv420p[v]`,
     '-map', '[v]', '-map', '1:a', '-t', String(dur), '-c:v', 'libx264', '-crf', '14', '-r', '30', '-c:a', 'pcm_s16le', '-ar', '48000', cuerpo]);
 

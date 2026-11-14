@@ -1,0 +1,7 @@
+{
+  "salida": "fiesta-vs-gta6.mp4",
+  "duracion": 9,
+  "arriba": { "t": 1225.7, "dur": 3.4, "velocidad": 1, "recorte": [0, 1280], "texto": "Mis amigos el 19 de nov.:<br>«¿Salimos de fiesta?» 🥳" },
+  "abajo": { "t": 1144.6, "dur": 2.7, "velocidad": 0.6, "recorte": [190, 830], "texto": "Yo y el compa que reservó GTA 6:" },
+  "audio": { "t": 1225.7, "dur": 3.4 }
+}
