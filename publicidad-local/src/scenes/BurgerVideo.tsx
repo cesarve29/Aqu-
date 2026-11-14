@@ -22,7 +22,7 @@ export const BurgerVideo: React.FC = () => {
         name="Video hamburguesa"
         src={staticFile("videos/hamburguesa.mp4")}
         muted
-        trimBefore={246}
+        trimBefore={231}
         objectFit="cover"
         style={{ position: "absolute", width: 1080, height: 1920 }}
       />
