@@ -173,27 +173,27 @@ export const Toppings: React.FC = () => {
       </Interactive.Div>
       <Audio
         name="SFX transición"
-        from={0}
+        from={3}
         src={staticFile("sfx/whoosh.wav")}
-        volume={0.58}
+        volume={0.78}
       />
       <Audio
         name="SFX marco"
         from={12}
         src={staticFile("sfx/thud.wav")}
-        volume={0.61}
+        volume={0.82}
       />
       <Audio
         name="SFX título 1"
         from={14}
         src={staticFile("sfx/swish.wav")}
-        volume={0.29}
+        volume={0.39}
       />
       <Audio
         name="SFX título 2"
         from={19}
         src={staticFile("sfx/pop.wav")}
-        volume={0.43}
+        volume={0.58}
       />
     </AbsoluteFill>
   );

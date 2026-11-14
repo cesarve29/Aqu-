@@ -168,33 +168,33 @@ export const HotDogPhotos: React.FC = () => {
       </Interactive.Div>
       <Audio
         name="SFX transición"
-        from={0}
+        from={3}
         src={staticFile("sfx/whoosh.wav")}
-        volume={0.58}
+        volume={0.78}
       />
       <Audio
         name="SFX título 1"
         from={9}
         src={staticFile("sfx/pop.wav")}
-        volume={0.36}
+        volume={0.49}
       />
       <Audio
         name="SFX título 2"
         from={15}
         src={staticFile("sfx/pop.wav")}
-        volume={0.43}
+        volume={0.58}
       />
       <Audio
         name="SFX foto 1"
         from={14}
         src={staticFile("sfx/thud.wav")}
-        volume={0.54}
+        volume={0.73}
       />
       <Audio
         name="SFX foto 2"
         from={22}
         src={staticFile("sfx/thud.wav")}
-        volume={0.54}
+        volume={0.73}
       />
     </AbsoluteFill>
   );

@@ -30,8 +30,7 @@
     "dev": "remotion studio",
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
-    "lint": "eslint src && tsc",
-    "sfx": "node scripts/generate-sfx.mjs"
+    "lint": "eslint src && tsc"
   },
   "allowScripts": {
     "esbuild": false

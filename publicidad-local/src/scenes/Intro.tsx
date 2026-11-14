@@ -152,31 +152,31 @@ export const Intro: React.FC = () => {
         name="SFX entrada logo"
         from={0}
         src={staticFile("sfx/swish.wav")}
-        volume={0.36}
+        volume={0.49}
       />
       <Audio
         name="SFX golpe logo"
         from={7}
         src={staticFile("sfx/impact.wav")}
-        volume={0.72}
+        volume={0.97}
       />
       <Audio
         name="SFX línea 1"
         from={22}
         src={staticFile("sfx/swish.wav")}
-        volume={0.32}
+        volume={0.43}
       />
       <Audio
         name="SFX línea 2"
         from={28}
         src={staticFile("sfx/swish.wav")}
-        volume={0.32}
+        volume={0.43}
       />
       <Audio
         name="SFX eslogan"
         from={43}
         src={staticFile("sfx/pop.wav")}
-        volume={0.43}
+        volume={0.58}
       />
     </AbsoluteFill>
   );

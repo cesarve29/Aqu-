@@ -93,27 +93,27 @@ export const BurgerVideo: React.FC = () => {
       </Interactive.Div>
       <Audio
         name="SFX transición"
-        from={0}
+        from={3}
         src={staticFile("sfx/whoosh.wav")}
-        volume={0.5}
+        volume={0.68}
       />
       <Audio
         name="SFX título"
         from={11}
         src={staticFile("sfx/thud.wav")}
-        volume={0.48}
+        volume={0.65}
       />
       <Audio
         name="SFX título pop"
         from={11}
         src={staticFile("sfx/pop.wav")}
-        volume={0.3}
+        volume={0.41}
       />
       <Audio
         name="SFX subtítulo"
         from={23}
         src={staticFile("sfx/swish.wav")}
-        volume={0.32}
+        volume={0.43}
       />
     </AbsoluteFill>
   );
