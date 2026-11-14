@@ -17,7 +17,7 @@ export const RemotionRoot: React.FC = () => {
           width={1080}
           height={1920}
           fps={30}
-          durationInFrames={100}
+          durationInFrames={99}
         />
         <Composition
           id="PerrosVideo"
@@ -25,7 +25,7 @@ export const RemotionRoot: React.FC = () => {
           width={1080}
           height={1920}
           fps={30}
-          durationInFrames={110}
+          durationInFrames={108}
         />
         <Composition
           id="PerrosFotos"
@@ -33,7 +33,7 @@ export const RemotionRoot: React.FC = () => {
           width={1080}
           height={1920}
           fps={30}
-          durationInFrames={90}
+          durationInFrames={93}
         />
         <Composition
           id="Toppings"
@@ -41,7 +41,7 @@ export const RemotionRoot: React.FC = () => {
           width={1080}
           height={1920}
           fps={30}
-          durationInFrames={100}
+          durationInFrames={93}
         />
         <Composition
           id="Hamburguesa"
@@ -49,7 +49,7 @@ export const RemotionRoot: React.FC = () => {
           width={1080}
           height={1920}
           fps={30}
-          durationInFrames={110}
+          durationInFrames={108}
         />
         <Composition
           id="Cierre"
@@ -57,7 +57,7 @@ export const RemotionRoot: React.FC = () => {
           width={1080}
           height={1920}
           fps={30}
-          durationInFrames={156}
+          durationInFrames={165}
         />
       </Folder>
       <Composition

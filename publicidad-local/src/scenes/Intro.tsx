@@ -30,13 +30,13 @@ export const Intro: React.FC = () => {
           borderRadius: "50%",
           border: `22px solid ${brand.colors.yellow}`,
           boxSizing: "border-box",
-          scale: interpolate(frame, [8, 40], [0.3, 2.6], {
+          scale: interpolate(frame, [13, 45], [0.3, 2.6], {
             easing: Easing.bezier(0.16, 1, 0.3, 1),
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
             output: "perceptual-scale",
           }),
-          opacity: interpolate(frame, [8, 14, 40], [0, 0.9, 0], {
+          opacity: interpolate(frame, [13, 19, 45], [0, 0.9, 0], {
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
           }),
@@ -53,13 +53,13 @@ export const Intro: React.FC = () => {
           left: 140,
           top: 290,
           filter: "drop-shadow(0px 30px 60px rgba(0,0,0,0.6))",
-          scale: interpolate(frame, [2, 30, 100], [0, 1, 1.08], {
+          scale: interpolate(frame, [7, 35, 99], [0, 1, 1.08], {
             easing: [Easing.spring({ damping: 9 }), Easing.linear],
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
             output: "perceptual-scale",
           }),
-          rotate: interpolate(frame, [2, 30], ["-40deg", "0deg"], {
+          rotate: interpolate(frame, [7, 35], ["-40deg", "0deg"], {
             easing: Easing.spring({ damping: 11 }),
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
@@ -81,7 +81,7 @@ export const Intro: React.FC = () => {
           letterSpacing: 4,
           color: brand.colors.yellow,
           textShadow: `8px 8px 0px ${brand.colors.red}`,
-          translate: interpolate(frame, [22, 42], ["-1100px 0px", "0px 0px"], {
+          translate: interpolate(frame, [27, 47], ["-1100px 0px", "0px 0px"], {
             easing: Easing.spring({ damping: 15 }),
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
@@ -106,7 +106,7 @@ export const Intro: React.FC = () => {
           letterSpacing: 4,
           color: brand.colors.light,
           textShadow: `8px 8px 0px ${brand.colors.red}`,
-          translate: interpolate(frame, [28, 48], ["1100px 0px", "0px 0px"], {
+          translate: interpolate(frame, [34, 54], ["1100px 0px", "0px 0px"], {
             easing: Easing.spring({ damping: 15 }),
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
@@ -126,7 +126,7 @@ export const Intro: React.FC = () => {
           width: 1080,
           display: "flex",
           justifyContent: "center",
-          scale: interpolate(frame, [42, 60], [0, 1], {
+          scale: interpolate(frame, [45, 63], [0, 1], {
             easing: Easing.spring({ damping: 10 }),
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
@@ -150,33 +150,33 @@ export const Intro: React.FC = () => {
       </Interactive.Div>
       <Audio
         name="SFX entrada logo"
-        from={0}
+        from={5}
         src={staticFile("sfx/swish.wav")}
-        volume={0.49}
+        volume={0.3}
       />
       <Audio
         name="SFX golpe logo"
-        from={7}
+        from={13}
         src={staticFile("sfx/impact.wav")}
-        volume={0.97}
+        volume={0.6}
       />
       <Audio
         name="SFX línea 1"
-        from={22}
+        from={27}
         src={staticFile("sfx/swish.wav")}
-        volume={0.43}
+        volume={0.27}
       />
       <Audio
         name="SFX línea 2"
-        from={28}
+        from={34}
         src={staticFile("sfx/swish.wav")}
-        volume={0.43}
+        volume={0.27}
       />
       <Audio
         name="SFX eslogan"
-        from={43}
+        from={46}
         src={staticFile("sfx/pop.wav")}
-        volume={0.58}
+        volume={0.36}
       />
     </AbsoluteFill>
   );

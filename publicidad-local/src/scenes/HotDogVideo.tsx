@@ -29,7 +29,7 @@ export const HotDogVideo: React.FC = () => {
           position: "absolute",
           width: 1080,
           height: 1920,
-          scale: interpolate(frame, [0, 110], [1.12, 1], {
+          scale: interpolate(frame, [0, 108], [1.12, 1], {
             easing: Easing.bezier(0.16, 1, 0.3, 1),
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
@@ -101,7 +101,7 @@ export const HotDogVideo: React.FC = () => {
           filter: "drop-shadow(0px 24px 30px rgba(0,0,0,0.55))",
           scale: interpolate(
             frame,
-            [30, 48, 70, 78, 86, 110],
+            [35, 53, 76, 84, 92, 108],
             [0, 1, 1, 1.1, 1, 1.04],
             {
               easing: [
@@ -118,7 +118,7 @@ export const HotDogVideo: React.FC = () => {
           ),
           rotate: interpolate(
             frame,
-            [30, 48, 110],
+            [35, 53, 108],
             ["-80deg", "10deg", "4deg"],
             {
               easing: [Easing.spring({ damping: 11 }), Easing.linear],
@@ -169,37 +169,37 @@ export const HotDogVideo: React.FC = () => {
         name="SFX transición"
         from={3}
         src={staticFile("sfx/whoosh.wav")}
-        volume={0.78}
+        volume={0.48}
       />
       <Audio
         name="SFX título 1"
         from={11}
         src={staticFile("sfx/swish.wav")}
-        volume={0.39}
+        volume={0.24}
       />
       <Audio
         name="SFX título 2"
         from={16}
         src={staticFile("sfx/swish.wav")}
-        volume={0.39}
+        volume={0.24}
       />
       <Audio
         name="SFX sello"
-        from={32}
+        from={38}
         src={staticFile("sfx/thud.wav")}
-        volume={0.88}
+        volume={0.55}
       />
       <Audio
         name="SFX sello pop"
-        from={33}
+        from={39}
         src={staticFile("sfx/pop.wav")}
-        volume={0.54}
+        volume={0.33}
       />
       <Audio
         name="SFX pulso"
-        from={71}
+        from={83}
         src={staticFile("sfx/pop.wav")}
-        volume={0.39}
+        volume={0.24}
       />
     </AbsoluteFill>
   );

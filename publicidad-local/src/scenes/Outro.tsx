@@ -62,7 +62,7 @@ export const Outro: React.FC = () => {
             extrapolateRight: "clamp",
             output: "perceptual-scale",
           }),
-          rotate: interpolate(frame, [6, 30, 156], ["-30deg", "0deg", "4deg"], {
+          rotate: interpolate(frame, [6, 30, 165], ["-30deg", "0deg", "4deg"], {
             easing: [Easing.spring({ damping: 11 }), Easing.linear],
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
@@ -84,7 +84,7 @@ export const Outro: React.FC = () => {
           lineHeight: 1,
           color: brand.colors.yellow,
           textShadow: `10px 10px 0px ${brand.colors.red}`,
-          scale: interpolate(frame, [16, 36], [0, 1], {
+          scale: interpolate(frame, [22, 42], [0, 1], {
             easing: Easing.spring({ damping: 9 }),
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
@@ -109,11 +109,11 @@ export const Outro: React.FC = () => {
           fontSize: 56,
           letterSpacing: 10,
           color: brand.colors.light,
-          opacity: interpolate(frame, [30, 44], [0, 1], {
+          opacity: interpolate(frame, [36, 50], [0, 1], {
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
           }),
-          translate: interpolate(frame, [30, 46], ["0px 50px", "0px 0px"], {
+          translate: interpolate(frame, [36, 52], ["0px 50px", "0px 0px"], {
             easing: Easing.bezier(0.16, 1, 0.3, 1),
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
@@ -142,14 +142,14 @@ export const Outro: React.FC = () => {
           fontSize: 136,
           letterSpacing: 4,
           color: brand.colors.dark,
-          translate: interpolate(frame, [36, 58], ["0px 900px", "0px 0px"], {
+          translate: interpolate(frame, [45, 67], ["0px 900px", "0px 0px"], {
             easing: Easing.spring({ damping: 14 }),
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
           }),
           scale: interpolate(
             frame,
-            [70, 80, 90, 104, 114, 124],
+            [89, 99, 109, 119, 129, 139],
             [1, 1.07, 1, 1, 1.07, 1],
             {
               easing: Easing.inOut(Easing.quad),
@@ -179,11 +179,11 @@ export const Outro: React.FC = () => {
           fontWeight: 800,
           fontSize: 76,
           color: brand.colors.light,
-          opacity: interpolate(frame, [50, 62], [0, 1], {
+          opacity: interpolate(frame, [60, 72], [0, 1], {
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
           }),
-          translate: interpolate(frame, [50, 68], ["0px 70px", "0px 0px"], {
+          translate: interpolate(frame, [60, 78], ["0px 70px", "0px 0px"], {
             easing: Easing.bezier(0.16, 1, 0.3, 1),
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
@@ -197,49 +197,49 @@ export const Outro: React.FC = () => {
         name="SFX transición"
         from={3}
         src={staticFile("sfx/whoosh.wav")}
-        volume={0.68}
+        volume={0.42}
       />
       <Audio
         name="SFX golpe logo"
-        from={10}
+        from={9}
         src={staticFile("sfx/impact.wav")}
-        volume={0.7}
+        volume={0.43}
       />
       <Audio
         name="SFX titular"
-        from={18}
+        from={24}
         src={staticFile("sfx/pop.wav")}
-        volume={0.63}
+        volume={0.39}
       />
       <Audio
         name="SFX teléfono sube"
-        from={36}
+        from={45}
         src={staticFile("sfx/swish.wav")}
-        volume={0.43}
+        volume={0.27}
       />
       <Audio
         name="SFX teléfono"
-        from={43}
+        from={53}
         src={staticFile("sfx/thud.wav")}
-        volume={0.82}
+        volume={0.51}
       />
       <Audio
         name="SFX Instagram"
-        from={51}
+        from={61}
         src={staticFile("sfx/pop.wav")}
-        volume={0.43}
+        volume={0.27}
       />
       <Audio
         name="SFX pulso 1"
-        from={72}
+        from={97}
         src={staticFile("sfx/thud.wav")}
-        volume={0.43}
+        volume={0.27}
       />
       <Audio
         name="SFX pulso 2"
-        from={106}
+        from={127}
         src={staticFile("sfx/thud.wav")}
-        volume={0.43}
+        volume={0.27}
       />
     </AbsoluteFill>
   );

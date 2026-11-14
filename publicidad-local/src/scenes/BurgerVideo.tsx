@@ -48,7 +48,7 @@ export const BurgerVideo: React.FC = () => {
           letterSpacing: 4,
           color: brand.colors.yellow,
           textShadow: `9px 9px 0px ${brand.colors.red}`,
-          scale: interpolate(frame, [10, 30], [0, 1], {
+          scale: interpolate(frame, [8, 28], [0, 1], {
             easing: Easing.spring({ damping: 10 }),
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
@@ -95,25 +95,25 @@ export const BurgerVideo: React.FC = () => {
         name="SFX transición"
         from={3}
         src={staticFile("sfx/whoosh.wav")}
-        volume={0.68}
+        volume={0.42}
       />
       <Audio
         name="SFX título"
-        from={11}
+        from={9}
         src={staticFile("sfx/thud.wav")}
-        volume={0.65}
+        volume={0.4}
       />
       <Audio
         name="SFX título pop"
-        from={11}
+        from={9}
         src={staticFile("sfx/pop.wav")}
-        volume={0.41}
+        volume={0.25}
       />
       <Audio
         name="SFX subtítulo"
         from={23}
         src={staticFile("sfx/swish.wav")}
-        volume={0.43}
+        volume={0.27}
       />
     </AbsoluteFill>
   );

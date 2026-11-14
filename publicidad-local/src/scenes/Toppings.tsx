@@ -57,7 +57,7 @@ export const Toppings: React.FC = () => {
           letterSpacing: 5,
           color: brand.colors.red,
           textShadow: `8px 8px 0px ${brand.colors.dark}`,
-          scale: interpolate(frame, [18, 36], [0, 1], {
+          scale: interpolate(frame, [23, 41], [0, 1], {
             easing: Easing.spring({ damping: 10 }),
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
@@ -105,16 +105,11 @@ export const Toppings: React.FC = () => {
             left: 0,
             top: -24,
             maxWidth: "none",
-            translate: interpolate(
-              frame,
-              [10, 100],
-              ["0px 0px", "-312px 0px"],
-              {
-                easing: Easing.inOut(Easing.quad),
-                extrapolateLeft: "clamp",
-                extrapolateRight: "clamp",
-              },
-            ),
+            translate: interpolate(frame, [10, 93], ["0px 0px", "-312px 0px"], {
+              easing: Easing.inOut(Easing.quad),
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+            }),
           }}
         />
       </Interactive.Div>
@@ -131,16 +126,11 @@ export const Toppings: React.FC = () => {
           lineHeight: 1,
           letterSpacing: 3,
           color: brand.colors.dark,
-          translate: interpolate(
-            frame,
-            [0, 100],
-            ["1080px 0px", "-760px 0px"],
-            {
-              easing: Easing.out(Easing.quad),
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-            },
-          ),
+          translate: interpolate(frame, [0, 93], ["1080px 0px", "-760px 0px"], {
+            easing: Easing.out(Easing.quad),
+            extrapolateLeft: "clamp",
+            extrapolateRight: "clamp",
+          }),
         }}
       >
         QUESO ★ MAÍZ ★ PAPA CHIP ★ NACHOS ★ PIÑA ★ CEBOLLA
@@ -159,7 +149,7 @@ export const Toppings: React.FC = () => {
           color: brand.colors.red,
           translate: interpolate(
             frame,
-            [0, 100],
+            [0, 93],
             ["-1700px 0px", "-120px 0px"],
             {
               easing: Easing.out(Easing.quad),
@@ -175,25 +165,25 @@ export const Toppings: React.FC = () => {
         name="SFX transición"
         from={3}
         src={staticFile("sfx/whoosh.wav")}
-        volume={0.78}
+        volume={0.48}
       />
       <Audio
         name="SFX marco"
         from={12}
         src={staticFile("sfx/thud.wav")}
-        volume={0.82}
+        volume={0.51}
       />
       <Audio
         name="SFX título 1"
         from={14}
         src={staticFile("sfx/swish.wav")}
-        volume={0.39}
+        volume={0.24}
       />
       <Audio
         name="SFX título 2"
-        from={19}
+        from={24}
         src={staticFile("sfx/pop.wav")}
-        volume={0.58}
+        volume={0.36}
       />
     </AbsoluteFill>
   );

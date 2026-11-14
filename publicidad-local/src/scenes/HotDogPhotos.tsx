@@ -85,7 +85,7 @@ export const HotDogPhotos: React.FC = () => {
           boxShadow: "0px 36px 60px rgba(0,0,0,0.5)",
           translate: interpolate(
             frame,
-            [6, 30, 90],
+            [6, 30, 93],
             ["-800px 500px", "0px 0px", "10px -22px"],
             {
               easing: [Easing.spring({ damping: 14 }), Easing.linear],
@@ -95,7 +95,7 @@ export const HotDogPhotos: React.FC = () => {
           ),
           rotate: interpolate(
             frame,
-            [6, 30, 90],
+            [6, 30, 93],
             ["-30deg", "-6deg", "-4deg"],
             {
               easing: [Easing.spring({ damping: 12 }), Easing.linear],
@@ -112,7 +112,7 @@ export const HotDogPhotos: React.FC = () => {
           height={740}
           fit="cover"
           style={{
-            scale: interpolate(frame, [6, 90], [1.18, 1.04], {
+            scale: interpolate(frame, [6, 93], [1.18, 1.04], {
               extrapolateLeft: "clamp",
               extrapolateRight: "clamp",
               output: "perceptual-scale",
@@ -136,7 +136,7 @@ export const HotDogPhotos: React.FC = () => {
           boxShadow: "0px 36px 60px rgba(0,0,0,0.5)",
           translate: interpolate(
             frame,
-            [14, 38, 90],
+            [14, 38, 93],
             ["900px 500px", "0px 0px", "-10px -22px"],
             {
               easing: [Easing.spring({ damping: 14 }), Easing.linear],
@@ -144,7 +144,7 @@ export const HotDogPhotos: React.FC = () => {
               extrapolateRight: "clamp",
             },
           ),
-          rotate: interpolate(frame, [14, 38, 90], ["30deg", "6deg", "4deg"], {
+          rotate: interpolate(frame, [14, 38, 93], ["30deg", "6deg", "4deg"], {
             easing: [Easing.spring({ damping: 12 }), Easing.linear],
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
@@ -158,7 +158,7 @@ export const HotDogPhotos: React.FC = () => {
           height={446}
           fit="cover"
           style={{
-            scale: interpolate(frame, [14, 90], [1.04, 1.18], {
+            scale: interpolate(frame, [14, 93], [1.04, 1.18], {
               extrapolateLeft: "clamp",
               extrapolateRight: "clamp",
               output: "perceptual-scale",
@@ -170,31 +170,31 @@ export const HotDogPhotos: React.FC = () => {
         name="SFX transición"
         from={3}
         src={staticFile("sfx/whoosh.wav")}
-        volume={0.78}
+        volume={0.48}
       />
       <Audio
         name="SFX título 1"
         from={9}
         src={staticFile("sfx/pop.wav")}
-        volume={0.49}
+        volume={0.3}
       />
       <Audio
         name="SFX título 2"
         from={15}
         src={staticFile("sfx/pop.wav")}
-        volume={0.58}
+        volume={0.36}
       />
       <Audio
         name="SFX foto 1"
         from={14}
         src={staticFile("sfx/thud.wav")}
-        volume={0.73}
+        volume={0.45}
       />
       <Audio
         name="SFX foto 2"
-        from={22}
+        from={23}
         src={staticFile("sfx/thud.wav")}
-        volume={0.73}
+        volume={0.45}
       />
     </AbsoluteFill>
   );
