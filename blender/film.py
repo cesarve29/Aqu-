@@ -1,5 +1,5 @@
 """
-Cortometraje 3D procedural (Blender 5.2, EEVEE) - personaje original.
+Cortometraje 3D procedural (Blender 5.3, EEVEE) - personaje original.
 
 Uso:
   python3 film.py --shot N --still FRAME --out ruta.png      # un fotograma
