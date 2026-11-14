@@ -1,3 +1,4 @@
+import { Audio } from "@remotion/media";
 import {
   AbsoluteFill,
   CanvasImage,
@@ -192,6 +193,54 @@ export const Outro: React.FC = () => {
         <CameraIcon size={96} color={brand.colors.yellow} />
         {brand.instagram}
       </Interactive.Div>
+      <Audio
+        name="SFX transición"
+        from={0}
+        src={staticFile("sfx/whoosh.wav")}
+        volume={0.5}
+      />
+      <Audio
+        name="SFX golpe logo"
+        from={10}
+        src={staticFile("sfx/impact.wav")}
+        volume={0.52}
+      />
+      <Audio
+        name="SFX titular"
+        from={18}
+        src={staticFile("sfx/pop.wav")}
+        volume={0.47}
+      />
+      <Audio
+        name="SFX teléfono sube"
+        from={36}
+        src={staticFile("sfx/swish.wav")}
+        volume={0.32}
+      />
+      <Audio
+        name="SFX teléfono"
+        from={43}
+        src={staticFile("sfx/thud.wav")}
+        volume={0.61}
+      />
+      <Audio
+        name="SFX Instagram"
+        from={51}
+        src={staticFile("sfx/pop.wav")}
+        volume={0.32}
+      />
+      <Audio
+        name="SFX pulso 1"
+        from={72}
+        src={staticFile("sfx/thud.wav")}
+        volume={0.32}
+      />
+      <Audio
+        name="SFX pulso 2"
+        from={106}
+        src={staticFile("sfx/thud.wav")}
+        volume={0.32}
+      />
     </AbsoluteFill>
   );
 };

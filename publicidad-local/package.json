@@ -1,7 +1,7 @@
 {
   "name": "publicidad-local",
   "version": "1.0.0",
-  "description": "My Remotion video",
+  "description": "Publicidad de Perro Loco hecha con Remotion",
   "repository": {},
   "license": "UNLICENSED",
   "engines": {
@@ -30,7 +30,8 @@
     "dev": "remotion studio",
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
-    "lint": "eslint src && tsc"
+    "lint": "eslint src && tsc",
+    "sfx": "node scripts/generate-sfx.mjs"
   },
   "allowScripts": {
     "esbuild": false

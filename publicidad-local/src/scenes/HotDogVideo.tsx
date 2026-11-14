@@ -1,4 +1,4 @@
-import { Video } from "@remotion/media";
+import { Audio, Video } from "@remotion/media";
 import {
   AbsoluteFill,
   Easing,
@@ -165,6 +165,42 @@ export const HotDogVideo: React.FC = () => {
           </div>
         </div>
       </Interactive.Div>
+      <Audio
+        name="SFX transición"
+        from={0}
+        src={staticFile("sfx/whoosh.wav")}
+        volume={0.58}
+      />
+      <Audio
+        name="SFX título 1"
+        from={11}
+        src={staticFile("sfx/swish.wav")}
+        volume={0.29}
+      />
+      <Audio
+        name="SFX título 2"
+        from={16}
+        src={staticFile("sfx/swish.wav")}
+        volume={0.29}
+      />
+      <Audio
+        name="SFX sello"
+        from={32}
+        src={staticFile("sfx/thud.wav")}
+        volume={0.65}
+      />
+      <Audio
+        name="SFX sello pop"
+        from={33}
+        src={staticFile("sfx/pop.wav")}
+        volume={0.4}
+      />
+      <Audio
+        name="SFX pulso"
+        from={71}
+        src={staticFile("sfx/pop.wav")}
+        volume={0.29}
+      />
     </AbsoluteFill>
   );
 };

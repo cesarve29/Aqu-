@@ -1,3 +1,4 @@
+import { Audio } from "@remotion/media";
 import {
   AbsoluteFill,
   CanvasImage,
@@ -170,6 +171,30 @@ export const Toppings: React.FC = () => {
       >
         PICO DE GALLO ★ MADURO ★ JALAPEÑOS ★ PEPINOS ★ PICO DE GALLO
       </Interactive.Div>
+      <Audio
+        name="SFX transición"
+        from={0}
+        src={staticFile("sfx/whoosh.wav")}
+        volume={0.58}
+      />
+      <Audio
+        name="SFX marco"
+        from={12}
+        src={staticFile("sfx/thud.wav")}
+        volume={0.61}
+      />
+      <Audio
+        name="SFX título 1"
+        from={14}
+        src={staticFile("sfx/swish.wav")}
+        volume={0.29}
+      />
+      <Audio
+        name="SFX título 2"
+        from={19}
+        src={staticFile("sfx/pop.wav")}
+        volume={0.43}
+      />
     </AbsoluteFill>
   );
 };

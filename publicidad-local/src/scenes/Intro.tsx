@@ -1,3 +1,4 @@
+import { Audio } from "@remotion/media";
 import {
   AbsoluteFill,
   CanvasImage,
@@ -147,6 +148,36 @@ export const Intro: React.FC = () => {
           {brand.slogan}
         </div>
       </Interactive.Div>
+      <Audio
+        name="SFX entrada logo"
+        from={0}
+        src={staticFile("sfx/swish.wav")}
+        volume={0.36}
+      />
+      <Audio
+        name="SFX golpe logo"
+        from={7}
+        src={staticFile("sfx/impact.wav")}
+        volume={0.72}
+      />
+      <Audio
+        name="SFX línea 1"
+        from={22}
+        src={staticFile("sfx/swish.wav")}
+        volume={0.32}
+      />
+      <Audio
+        name="SFX línea 2"
+        from={28}
+        src={staticFile("sfx/swish.wav")}
+        volume={0.32}
+      />
+      <Audio
+        name="SFX eslogan"
+        from={43}
+        src={staticFile("sfx/pop.wav")}
+        volume={0.43}
+      />
     </AbsoluteFill>
   );
 };

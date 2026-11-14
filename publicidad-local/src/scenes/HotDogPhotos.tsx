@@ -1,3 +1,4 @@
+import { Audio } from "@remotion/media";
 import {
   AbsoluteFill,
   CanvasImage,
@@ -165,6 +166,36 @@ export const HotDogPhotos: React.FC = () => {
           }}
         />
       </Interactive.Div>
+      <Audio
+        name="SFX transición"
+        from={0}
+        src={staticFile("sfx/whoosh.wav")}
+        volume={0.58}
+      />
+      <Audio
+        name="SFX título 1"
+        from={9}
+        src={staticFile("sfx/pop.wav")}
+        volume={0.36}
+      />
+      <Audio
+        name="SFX título 2"
+        from={15}
+        src={staticFile("sfx/pop.wav")}
+        volume={0.43}
+      />
+      <Audio
+        name="SFX foto 1"
+        from={14}
+        src={staticFile("sfx/thud.wav")}
+        volume={0.54}
+      />
+      <Audio
+        name="SFX foto 2"
+        from={22}
+        src={staticFile("sfx/thud.wav")}
+        volume={0.54}
+      />
     </AbsoluteFill>
   );
 };

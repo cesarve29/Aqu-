@@ -1,4 +1,4 @@
-import { Video } from "@remotion/media";
+import { Audio, Video } from "@remotion/media";
 import {
   AbsoluteFill,
   Easing,
@@ -91,6 +91,30 @@ export const BurgerVideo: React.FC = () => {
           ¡Para comer como loco!
         </div>
       </Interactive.Div>
+      <Audio
+        name="SFX transición"
+        from={0}
+        src={staticFile("sfx/whoosh.wav")}
+        volume={0.5}
+      />
+      <Audio
+        name="SFX título"
+        from={11}
+        src={staticFile("sfx/thud.wav")}
+        volume={0.48}
+      />
+      <Audio
+        name="SFX título pop"
+        from={11}
+        src={staticFile("sfx/pop.wav")}
+        volume={0.3}
+      />
+      <Audio
+        name="SFX subtítulo"
+        from={23}
+        src={staticFile("sfx/swish.wav")}
+        volume={0.32}
+      />
     </AbsoluteFill>
   );
 };
