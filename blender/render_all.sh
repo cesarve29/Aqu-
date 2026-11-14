@@ -16,7 +16,7 @@ python3 -c "import bpy; assert bpy.app.version >= (5, 3, 0)" 2>/dev/null || pip 
 ldconfig -p | grep -q libEGL.so.1 || { apt-get update -q >/dev/null; apt-get install -y -q libegl1 libegl-mesa0 libgl1-mesa-dri libgles2 >/dev/null; }
 
 ./fetch_assets.sh
-TRAILER="Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+TRAILER="Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01J5NsSb9v3CphZESL6L7pfR"
 
 push() {
