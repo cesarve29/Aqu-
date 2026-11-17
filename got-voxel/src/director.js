@@ -5,7 +5,7 @@ import { Character } from './characters.js';
 import { Dragon } from './dragon.js';
 import { Ash, FireStream, Flames, Embers, Smoke, Lava } from './fx.js';
 import { SHOTS } from './shots.js';
-import { meshGrid, voxMaterial } from './voxel.js';
+import { meshGrid, voxMaterial, Grid, clamp, lerp, hash3, mix } from './voxel.js';
 
 function makeSky() {
   const mat = new THREE.ShaderMaterial({
@@ -72,6 +72,9 @@ export class Director {
       embers: new Embers(scene, 1500), smoke: new Smoke(scene, 300), lava: new Lava(scene, 80, 60, 0.12),
       fog: new Smoke(scene, 160, 0x8a949c, 0.18),
     };
+    // mar (plano final)
+    this.sea = new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000, 1, 1), new THREE.MeshStandardMaterial({ color: 0x27323a, roughness: 0.35, metalness: 0.3 }));
+    this.sea.rotation.x = -Math.PI / 2; this.sea.position.y = 0; scene.add(this.sea);
     this.shots = SHOTS;
   }
 
@@ -82,7 +85,7 @@ export class Director {
 
   resetState() {
     const { scene, bokeh, bloom, grade, renderer } = this.ctx;
-    this.world.group.visible = true;
+    this.world.group.visible = true; if (this.sea) this.sea.visible = false;
     // visibilidad por defecto
     this.jon.root.visible = true; this.dany.root.visible = true; this.drogon.root.visible = false;
     this.throne.visible = true;
@@ -98,7 +101,36 @@ export class Director {
     const G = grade.uniforms;
     G.uTint.value.set(0.95, 1.0, 1.06); G.uLift.value.set(0.01, 0.015, 0.03); G.uSat.value = 0.85; G.uContrast.value = 1.06; G.uVignette.value = 0.4; G.uGrain.value = 0.03; G.uFade.value = 1;
     renderer.toneMappingExposure = 1.0;
-    this.throneMat.userData.emiGain.value = 0;
+  }
+
+  // fundido del trono: m 0..1 (forma), h 0..1 (calor)
+  setThroneMelt(m, h) {
+    const q = Math.round(m * 40) / 40, qh = Math.round(h * 20) / 20;
+    const key = q + '|' + qh;
+    if (this.meltKey === key) return;
+    this.meltKey = key;
+    this.meltCache = this.meltCache || new Map();
+    let geo = this.meltCache.get(key);
+    if (!geo) {
+      const src = this.throneData.grid, [cx, , cz] = this.throneData.origin;
+      const g = new Grid(src.nx + 40, src.ny, src.nz + 40);
+      for (let z = 0; z < src.nz; z++) for (let y = 0; y < src.ny; y++) for (let x = 0; x < src.nx; x++) {
+        const c = src.get(x, y, z); if (c < 0) continue;
+        const yn = y / src.ny;
+        // los voxeles altos se funden antes; caen y se desparraman
+        const local = clamp(q * 1.6 - (1 - yn) * 0.6 + (hash3(x, y, z) - 0.5) * 0.15);
+        const ny = Math.floor(y * (1 - local * 0.97) * (1 - q * 0.6));
+        const spread = 1 + q * 0.7 * (1 - ny / src.ny);
+        const nx = Math.round(cx + (x - cx) * spread) + 20, nz = Math.round(cz + (z - cz) * spread) + 20;
+        const heat = clamp(qh * (0.6 + local * 0.8) - yn * 0.15 * (1 - q));
+        const col = heat > 0.02 ? mix(c, heat > 0.6 ? 0xffd27a : 0xff6a1a, Math.min(1, heat * 1.3)) : c;
+        if (!g.solid(nx, ny, nz)) { g.set(nx, ny, nz, col); if (heat > 0.05) g.setE(nx, ny, nz, Math.round(heat * 255)); }
+      }
+      geo = meshGrid(g, { scale: this.throneData.v, origin: [cx + 20, 0, cz + 20] });
+      this.meltCache.set(key, geo);
+    }
+    this.throne.geometry = geo;
+    this.throneMat.userData.emiGain.value = 5;
   }
 
   setSun(dirFrom, target, halfSize = 6) {
@@ -114,12 +146,17 @@ export class Director {
     const shot = this.shotAt(t);
     const lt = t - shot.t0;
     this.sky.material.uniforms.uTime.value = t;
+    // estado global del trono (se funde con el fuego)
+    const m = clamp((t - 141) / 21, 0, 1), h = t < 139 ? 0 : t < 166 ? clamp((t - 139) / 9) : lerp(1, 0.35, clamp((t - 166) / 40));
+    this.setThroneMelt(m * m * (3 - 2 * m), h);
+    if (h === 0) this.throneMat.userData.emiGain.value = 0;
+    this.throne.visible = m < 0.97;
     shot.run(this, lt, t, shot);
     const dbg = new URLSearchParams(location.search).get('debug');
     if (dbg === 'tpose' || dbg === 'iso') {
       if (dbg === 'iso') { this.world.group.visible = false; this.throne.visible = false; }
-      this.jon.root.position.set(0, 0.93, 0); this.jon.root.rotation.set(0, 0, 0); this.jon.pose({ expr: { eyes: 'open', mouth: 'closed', brow: 'sad', tears: true } });
-      this.dany.root.position.set(1.0, 0.88, 0); this.dany.root.rotation.set(0, 0, 0); this.dany.pose({ expr: { eyes: 'closed', mouth: 'part', brow: 'neutral' }, dagger: true });
+      this.jon.root.position.set(0, 0.75, 0); this.jon.root.rotation.set(0, 0, 0); this.jon.pose({ expr: { eyes: 'open', mouth: 'closed', brow: 'sad', tears: true } });
+      this.dany.root.position.set(1.0, 0.75, 0); this.dany.root.rotation.set(0, 0, 0); this.dany.pose({ expr: { eyes: 'closed', mouth: 'part', brow: 'neutral' }, dagger: true });
       this.drogon.root.visible = true; this.drogon.pose({ pos: [0, 0, -9], yaw: 0.6, wing: { raise: 0.3, sweep: 0.2, elbow: 0.3, spread: 1 } });
       for (const k in this.fx) this.fx[k].visible = false;
     }

@@ -89,7 +89,8 @@ export function buildWorld(scene) {
     // muro lateral bajo, muy destruido
     g.sdf((x, y, z) => {
       const wz = (z - OZ) * WV;
-      const hmax = 3 + 6 * fbm(wz * 0.15, side * 5, 1, 3);
+      let hmax = 3 + 6 * fbm(wz * 0.15, side * 5, 1, 3);
+      if (side > 0 && wz > -9 && wz < 3) hmax = 1.0 + fbm(wz, 3, 3, 2); // brecha hacia la ciudad
       return Math.max(sd.box(x, y, z, vx(side * 13.5), 0, vz(-6), W2V(0.9), 999, W2V(17)), y - vy(hmax));
     }, (x, y, z) => jitter(REDSTONE, 0.2, x, y, z), BB(vx(side * 13.5 - 1), 0, vz(-24), vx(side * 13.5 + 1), vy(10), vz(12)));
   }

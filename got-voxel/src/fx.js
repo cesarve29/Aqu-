@@ -53,10 +53,10 @@ export class Ash {
 
 // gradiente de color del fuego segun edad (0..1)
 function fireColor(f, out, hot = 1) {
-  if (f < 0.08) out.setRGB(9 * hot, 7.5 * hot, 4.5 * hot);
-  else if (f < 0.35) { const k = (f - 0.08) / 0.27; out.setRGB(lerp(9, 7, k) * hot, lerp(7.5, 2.6, k) * hot, lerp(4.5, 0.5, k) * hot); }
-  else if (f < 0.7) { const k = (f - 0.35) / 0.35; out.setRGB(lerp(7, 2.2, k) * hot, lerp(2.6, 0.45, k) * hot, lerp(0.5, 0.08, k) * hot); }
-  else { const k = (f - 0.7) / 0.3; out.setRGB(lerp(2.2, 0.04, k), lerp(0.45, 0.035, k), lerp(0.08, 0.03, k)); }
+  if (f < 0.08) out.setRGB(4.0 * hot, 3.0 * hot, 1.6 * hot);
+  else if (f < 0.35) { const k = (f - 0.08) / 0.27; out.setRGB(lerp(4.0, 3.2, k) * hot, lerp(3.0, 1.1, k) * hot, lerp(1.6, 0.18, k) * hot); }
+  else if (f < 0.7) { const k = (f - 0.35) / 0.35; out.setRGB(lerp(3.2, 1.2, k) * hot, lerp(1.1, 0.22, k) * hot, lerp(0.18, 0.04, k) * hot); }
+  else { const k = (f - 0.7) / 0.3; out.setRGB(lerp(1.2, 0.05, k), lerp(0.22, 0.04, k), lerp(0.04, 0.035, k)); }
   return out;
 }
 
@@ -209,7 +209,7 @@ export class Lava {
       const n = fbm(wx * 1.3 + t * 0.35, t * 0.25, wz * 1.3 - t * 0.2, 3);
       const crust = clamp((n - 0.45) * 4);
       const heat = (opts.heat ?? 1) * m;
-      C.setRGB(lerp(7.5, 0.25, crust) * heat + 0.04, lerp(1.8, 0.05, crust) * heat + 0.02, lerp(0.15, 0.02, crust) * heat + 0.02);
+      C.setRGB(lerp(3.2, 0.2, crust) * heat + 0.04, lerp(0.8, 0.04, crust) * heat + 0.02, lerp(0.08, 0.02, crust) * heat + 0.02);
       P.set(wx, origin[1] + h, wz); S.set(v, v * (1 + h * 2), v);
       M4.compose(P, Q.identity(), S); this.mesh.setMatrixAt(i, M4); this.mesh.setColorAt(i, C);
     }

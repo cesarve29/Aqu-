@@ -3,9 +3,9 @@ import * as THREE from 'three';
 import { Grid, meshGrid, voxMaterial, sd, jitter, shade, mix, hash3, clamp, lerp, fbm } from './voxel.js';
 
 export const DV = 0.08; // voxel del dragon (m)
-const MAT = voxMaterial({ roughness: 0.62, metalness: 0.05, key: 'dragon', emiGain: 3.0 });
+const MAT = voxMaterial({ roughness: 0.5, metalness: 0.1, key: 'dragon', emiGain: 3.0 });
 
-const SCALE_A = 0x1b1716, SCALE_B = 0x2a201d, SCALE_R = 0x3d1d17, BELLY = 0x4a3a33, SPIKE = 0x120f0f, HORN = 0x2a2420;
+const SCALE_A = 0x2a2422, SCALE_B = 0x3a2e2a, SCALE_R = 0x5a2a20, BELLY = 0x4a3a33, SPIKE = 0x120f0f, HORN = 0x2a2420;
 function scaleCol(x, y, z, belly = 0) {
   const pat = ((x + (y >> 1)) % 3 === 0) ? 0.82 : 1;
   const base = hash3(x >> 1, y >> 1, z >> 1) < 0.18 ? SCALE_R : (hash3(x, y, z) < 0.5 ? SCALE_A : SCALE_B);
