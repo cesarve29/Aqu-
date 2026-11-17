@@ -1,7 +1,7 @@
-"""Genera la geometría (malla inflada) y las texturas pintadas de la luna.
+"""Genera la geometría 3D de la luna (cuerpo esférico tallado + nariz en cono) y sus texturas.
 
-Coordenadas normalizadas: radio exterior = 1, centro en el origen, Y hacia arriba.
-Salida en assets/: moon_mesh.npz, moon_albedo.png, moon_bump.png, preview.png
+Coordenadas normalizadas: radio exterior = 1, centro en el origen, Y hacia arriba, Z hacia la cámara.
+Salida en assets/: moon_mesh.npz (cuerpo), nose_mesh.npz, moon_albedo.png, moon_bump.png, preview.png
 """
 import os
 import numpy as np
@@ -87,8 +87,7 @@ dark_poly = path([
     [(1.6, 0.62), (1.6, 0.69), (0.76, 0.69)],
     [(0.76, 0.69), (0.644, 0.752), (0.536, 0.813), (0.40, 0.851), (0.22, 0.86), (-0.03, 0.836),
      (-0.18, 0.757), (-0.30, 0.577), (-0.325, 0.35), (-0.305, 0.17), (-0.265, 0.088),
-     (-0.20, 0.066), (0.20, 0.252), (0.68, 0.475)],
-    [(0.68, 0.475), (0.31, 0.214), (0.04, -0.012), (-0.06, -0.13), (-0.09, -0.195)],
+     (-0.19, 0.035), (-0.12, -0.03), (-0.09, -0.11), (-0.09, -0.195)],
     [(-0.09, -0.195), (0.0, -0.222), (0.063, -0.245)],
     [(0.063, -0.245), (0.058, -0.29), (0.097, -0.33), (0.176, -0.36), (0.232, -0.352)],
     [(0.232, -0.352), (0.29, -0.31), (0.322, -0.288)],
@@ -190,15 +189,22 @@ crater_h *= 1 - fz
 crater_ring *= 1 - fz
 crater_in *= 1 - fz
 
-# ---------------------------------------------------------------- altura (malla)
-dome = 0.12 + 0.16 * np.clip(1 - R ** 2, 0, 1)
-H = round_profile(d_sil, 0.11) * dome
-H += 0.045 * round_profile(d_cheek, 0.05) * (d_sil > 0)
-H += 0.035 * round_profile(d_fold, 0.03) * (d_sil > 0)
-teeth_in = smoothstep(0.0, 0.035, d_teeth) * (1 - smoothstep(-0.02, 0.0, d_cheek))
-H -= 0.03 * teeth_in
-H += 0.022 * np.exp(-((d_eye - 0.012) / 0.03) ** 2) * (d_sil > 0)
+# ---------------------------------------------------------------- altura (malla 3D)
+SPH = 0.78 * np.sqrt(np.clip(1 - R ** 2, 0, 1))           # volumen esférico (elipsoide)
+edge = round_profile(d_sil, 0.13)
+BASE = SPH * edge
+fe = round_profile(d_sil, 0.035)                           # los rasgos se anulan en el borde
+H = BASE.copy()
+H += 0.07 * round_profile(d_cheek, 0.06) * fe              # pómulo / labio superior
+H += 0.06 * round_profile(d_fold, 0.035) * fe              # pliegue del labio inferior
+teeth_in = smoothstep(0.0, 0.03, d_teeth) * (1 - smoothstep(-0.02, 0.0, d_cheek))
+H -= 0.06 * teeth_in * fe                                  # boca hundida
+H += 0.032 * teeth_in * round_profile(d_tline, 0.035) * fe  # cada diente abombado
+H -= 0.10 * smoothstep(0.0, -0.03, d_eye) * fe            # cuenca del ojo
+H += 0.035 * np.exp(-((d_eye - 0.015) / 0.025) ** 2) * fe  # párpado / borde de la cuenca
+H += 0.018 * crater_h * fe
 H = np.where(d_sil > 0, H, 0).astype(np.float32)
+BACK = np.where(d_sil > 0, BASE, 0).astype(np.float32)
 
 # ---------------------------------------------------------------- bump (detalle fino)
 noise = ndimage.gaussian_filter(rng.standard_normal((N, N)).astype(np.float32), 6)
@@ -221,7 +227,7 @@ def lerp(a, b, t):
 
 center_col = hexc("#FFF8DA")
 edge_col = hexc("#F4D47A")
-t_edge = np.clip(1 - smoothstep(0.0, 0.09, d_sil) * 0.8 - 0.1 * R ** 3, 0, 1) * 0.85
+t_edge = np.clip(1 - smoothstep(0.0, 0.06, d_sil), 0, 1) * 0.35 + 0.15 * R ** 4
 alb = lerp(center_col[None, None], edge_col[None, None], t_edge)
 alb *= (1 + 0.012 * noise2)[..., None]
 # cráteres
@@ -245,18 +251,12 @@ outline = np.maximum.reduce([
 ])
 outline *= (d_sil > 0.003)
 alb = lerp(alb, hexc("#B88A45")[None, None], np.clip(outline, 0, 1))
-# sombra suave bajo el pómulo y alrededor del ojo
-shade = 0.35 * np.exp(-((-d_cheek - 0.02) / 0.03) ** 2) * (d_cheek < 0) * (Y > -0.32) * (Y < -0.15)
-shade += 0.25 * np.exp(-((d_eye - 0.04) / 0.03) ** 2)
-alb = lerp(alb, hexc("#E2B95A")[None, None], np.clip(shade * (1 - teeth_m), 0, 1))
 alb = np.clip(alb, 0, 1)
 # fuera de la silueta: color de borde (evita halos al filtrar)
 alb[d_sil < 0] = edge_col
 
 Image.fromarray((alb * 255 + 0.5).astype(np.uint8)).save(os.path.join(OUT, "moon_albedo.png"))
 Image.fromarray((bump * 65535).astype(np.uint16)).save(os.path.join(OUT, "moon_bump.png"))
-# máscara de dientes (para un material más brillante) en canal propio
-Image.fromarray((teeth_m * 255).astype(np.uint8)).save(os.path.join(OUT, "moon_teeth_mask.png"))
 
 # ---------------------------------------------------------------- malla
 def sample(img, px, py):
@@ -311,16 +311,54 @@ nb = int(np.sum(used < len(bpts)))
 hz = sample(H, pts[:, 0], pts[:, 1])
 hz[:nb] = 0.0
 front = np.column_stack([pts, hz])
-back = np.column_stack([pts[nb:], -hz[nb:] * 0.6])
+hb = sample(BACK, pts[:, 0], pts[:, 1])
+back = np.column_stack([pts[nb:], -hb[nb:]])
 V = np.vstack([front, back])
 bmap = np.concatenate([np.arange(nb), len(pts) + np.arange(len(pts) - nb)])
 Fb = bmap[F][:, ::-1]
 FF = np.vstack([F, Fb])
 np.savez_compressed(os.path.join(OUT, "moon_mesh.npz"), V=V.astype(np.float32), F=FF.astype(np.int32),
                     eye=np.array([EYE_C[0], EYE_C[1], EYE_R,
-                                  float(sample(H, np.array([EYE_C[0]]), np.array([EYE_C[1]]))[0])]),
+                                  float(sample(BASE, np.array([EYE_C[0]]), np.array([EYE_C[1]]))[0])]),
                     L=np.array([L]))
 print("verts", len(V), "faces", len(FF), "boundary", nb)
+
+# ---------------------------------------------------------------- nariz (cono 3D que sobresale)
+B = np.array([-0.155, -0.062])
+T = np.array([0.68, 0.475])
+zB = float(sample(BASE, B[:1], B[1:])[0]) - 0.06
+zT = 0.80
+ax2 = T - B
+u = np.array([-ax2[1], ax2[0], 0.0]); u /= np.linalg.norm(u)
+nv, nr = 40, 120
+nverts = []
+for i in range(nr + 1):
+    t = -0.12 + 1.12 * i / nr
+    c = np.array([B[0] + ax2[0] * t, B[1] + ax2[1] * t, zB + (zT - zB) * max(t, 0) ** 0.9])
+    c[:2] += 0.035 * np.sin(np.pi * np.clip(t, 0, 1)) * u[:2]
+    tt = np.clip(t, 0, 1)
+    w = 0.142 * (1 - tt) ** 1.05 + 0.002
+    th = 0.105 * (1 - tt) ** 1.0 + 0.002
+    axis = np.array([ax2[0], ax2[1], (zT - zB)]); axis /= np.linalg.norm(axis)
+    v = np.cross(axis, u); v /= np.linalg.norm(v)
+    if v[2] < 0:
+        v = -v
+    for j in range(nv):
+        ph = 2 * np.pi * j / nv
+        nverts.append(c + w * np.cos(ph) * u + th * np.sin(ph) * v)
+nverts.append(np.array([T[0], T[1], zT]))
+nverts = np.array(nverts)
+nfaces = []
+for i in range(nr):
+    for j in range(nv):
+        a0, a1 = i * nv + j, i * nv + (j + 1) % nv
+        b0, b1 = a0 + nv, a1 + nv
+        nfaces += [[a0, a1, b1], [a0, b1, b0]]
+tip = len(nverts) - 1
+for j in range(nv):
+    nfaces.append([nr * nv + j, nr * nv + (j + 1) % nv, tip])
+np.savez_compressed(os.path.join(OUT, "nose_mesh.npz"), V=nverts.astype(np.float32),
+                    F=np.array(nfaces, np.int32))
 
 # ---------------------------------------------------------------- preview vs referencia
 ref = Image.open("/root/.claude/uploads/c72e5fec-7855-5826-8e0c-9f7e65553794/5090cae3-image.webp").convert("RGB")
