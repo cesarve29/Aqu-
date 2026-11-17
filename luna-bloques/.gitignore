@@ -1,0 +1,5 @@
+frames/
+preview/
+assets/_*.png
+__pycache__/
+render.log
