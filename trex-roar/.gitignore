@@ -1,0 +1,6 @@
+__pycache__/
+frames/
+plates/
+trex_mesh_cache.npz
+*.blend1
+*.wav
