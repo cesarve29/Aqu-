@@ -387,8 +387,17 @@ clouds = [
     (2, (-20, -72, -47), 24, 0.75, 12, True), (3, (21, -74, -48), 22, 0.75, -12, False),
     (0, (2, -64, -53), 28, 0.72, 0, False),
 ]
+cloud_objs = []
 for i, (idx, loc, w, br, rz, fl) in enumerate(clouds):
-    place_cloud(f"Nube_{i:02d}", idx, loc, w, br, rz, fl)
+    cloud_objs.append(place_cloud(f"Nube_{i:02d}", idx, loc, w, br, rz, fl))
+
+# la capa que cruza la cámara se abre como un telón para revelar la luna
+PART_START, PART_END = 196, 262
+for i, dx in ((18, -24.0), (19, 25.0), (20, -22.0)):
+    ob = cloud_objs[i]
+    ob.keyframe_insert("location", frame=PART_START)
+    ob.location.x += dx
+    ob.keyframe_insert("location", frame=PART_END)
 
 # ------------------------------------------------------------------ pueblo 3D
 GROUND = -64.0
