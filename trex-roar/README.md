@@ -7,7 +7,7 @@ bruma de un bosque a contraluz, da un paso hacia la cámara y le ruge; la cámar
 
 | Archivo | Qué es |
 |---|---|
-| `trex_roar_1080x1920.mp4` | Vídeo final (con audio sintetizado) |
+| `trex_roar_1080x1920.mp4` | Vídeo final (con efectos de sonido de ElevenLabs) |
 | `stills/` | Dos fotogramas del vídeo |
 | `trex_roar.blend` | Escena completa, lista para abrir en Blender 5.3 |
 | `build_scene.py` | Construye toda la escena y guarda el `.blend` |
@@ -16,7 +16,8 @@ bruma de un bosque a contraluz, da un paso hacia la cámara y le ruge; la cámar
 | `forest.py` | Terreno, coníferas, árboles de hoja, helechos, hierba, rocas, motas de polvo |
 | `animate.py` | Actuación del T-Rex (FK + IK analítica de patas) y cámara en mano con temblor |
 | `render.py` / `encode.sh` | Render de fotogramas y montaje con ffmpeg |
-| `make_audio.py` | Banda sonora sintetizada (rugido, pisada, ambiente) sin samples |
+| `sfx/` + `mix_sfx.py` | Efectos de sonido generados con ElevenLabs (rugido, bramido, pisada, gruñido, ambiente de bosque) y su mezcla sincronizada con la animación |
+| `make_audio.py` | Banda sonora sintetizada original (ya no se usa en el vídeo) |
 
 ## Reproducir
 
@@ -24,7 +25,7 @@ bruma de un bosque a contraluz, da un paso hacia la cámara y le ruge; la cámar
 pip install bpy==5.3.0 numpy scipy scikit-image
 python3 build_scene.py trex_roar.blend            # ~4 min (incluye hornear el fondo lejano)
 python3 render.py trex_roar.blend frames 1 360 1 --pct 60
-python3 make_audio.py trex_roar.wav
+python3 mix_sfx.py trex_roar.wav
 ./encode.sh frames trex_roar.wav trex_roar_1080x1920.mp4
 ```
 
