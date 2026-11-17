@@ -8,6 +8,7 @@ bruma de un bosque a contraluz, da un paso hacia la cámara y le ruge; la cámar
 | Archivo | Qué es |
 |---|---|
 | `trex_roar_1080x1920.mp4` | Vídeo final (con audio sintetizado) |
+| `stills/` | Dos fotogramas del vídeo |
 | `trex_roar.blend` | Escena completa, lista para abrir en Blender 5.3 |
 | `build_scene.py` | Construye toda la escena y guarda el `.blend` |
 | `trex_sdf.py` | Modelado del T-Rex como campo de distancias + *marching cubes* |
