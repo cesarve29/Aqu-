@@ -1,6 +1,7 @@
 // Montador de Shorts de clips (vertical 1080x1920) con el estilo de Seis en Vice.
 // Uso: node edit-short.js <video_origen> <config.json>
-// config: { salida, titulo: [linea1, linea2], transicion, clips: [{ t, dur, texto }] }
+// config: { salida, titulo: [linea1, linea2], transicion, banner?, credito?, clips: [{ t, dur, texto }] }
+//  - "credito": texto fijo pequeño abajo a la izquierda (ej. "🎥 Vídeo original: IGN") cuando el material es de otro creador.
 //  - El primer clip es el gancho: lleva el título grande encima (sin intro, regla 1).
 //  - Cada clip siguiente puede llevar una etiqueta ("texto").
 //  - Audio original de los clips + efectos de la biblioteca ../sfx por debajo (reglas 7 y 8).
@@ -32,6 +33,7 @@ const CSS = `@import url('https://fonts.googleapis.com/css2?family=Anton&family=
   text-shadow:0 0 8px #34e1ff,0 0 20px #18b8ff,0 3px 6px #000}
 .banner{position:absolute;left:0;right:0;top:205px;text-align:center}
 .banner span{display:inline-block;font:900 44px Montserrat,sans-serif;letter-spacing:.12em;color:#fff;background:#e0102f;padding:10px 26px;border-radius:12px;box-shadow:0 0 30px #e0102faa,0 6px 0 #120626}
+.credito{position:absolute;left:40px;bottom:330px;font:800 30px Montserrat,sans-serif;color:#fff;opacity:.85;text-shadow:0 2px 6px #000,0 0 2px #000}
 .marca b{font:86px/0 'Mr Dafoe',cursive;letter-spacing:0;color:#fff;text-shadow:0 0 10px #ff3fb4,0 0 26px #ff2a8a;vertical-align:-6px;margin-left:4px}`;
 async function pngs(tmp) {
   const b = await chromium.launch();
@@ -42,7 +44,7 @@ async function pngs(tmp) {
     await p.screenshot({ path: file, omitBackground: true });
     return file;
   };
-  const out = { marca: await shot(`<div class="marca">SEIS EN <b>Vice</b></div>${cfg.banner ? `<div class="banner"><span>${cfg.banner}</span></div>` : ''}`, path.join(tmp, 'marca.png')) };
+  const out = { marca: await shot(`<div class="marca">SEIS EN <b>Vice</b></div>${cfg.banner ? `<div class="banner"><span>${cfg.banner}</span></div>` : ''}${cfg.credito ? `<div class="credito">${cfg.credito}</div>` : ''}`, path.join(tmp, 'marca.png')) };
   out.titulo = await shot(`<div class="titulo">${cfg.titulo[0]}<br><span class="b">${cfg.titulo[1] || ''}</span></div>`, path.join(tmp, 'titulo.png'));
   out.etq = [];
   for (const [i, c] of cfg.clips.entries()) out.etq.push(c.texto ? await shot(`<div class="etq"><span>${c.texto}</span></div>`, path.join(tmp, `e${i}.png`)) : null);

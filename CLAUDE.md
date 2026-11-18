@@ -29,6 +29,9 @@ Guía completa (títulos, descripciones, etiquetas, derechos): `canal-gta6/GUIA-
    efectos de sonido por debajo, a volumen moderado (`VOL_SFX` ≈ 0.3, que no tapen el clip).
    La música la añade el usuario. Vídeo del tráiler grande, sin bordes de color, fundido con el fondo.
 
+9. **Material de otros creadores: dar SIEMPRE crédito.** En el vídeo (texto fijo "🎥 Vídeo original: <creador>",
+   opción `credito` de `edit-short.js`) y en la descripción ("Vídeo original: <creador> – <título>").
+
 ### Herramientas
 
 - Diseños y animaciones: `canal-gta6/diseno/` (`banner.js`, `avatar.js`, `intro.js`, `cuenta-atras.js`, `componer-cuenta-atras.js`).
