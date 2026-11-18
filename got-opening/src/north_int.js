@@ -163,19 +163,19 @@ export class NorthInteriors {
     cand.forEach((p) => { for (let j = 0; j < 3; j++) { M.makeTranslation(p[0] + j * 0.12 - 0.12, p[1] + (j === 1 ? 0.05 : 0), p[2]); ci.setMatrixAt(k++, M); } });
     r.add(ci);
     this.candles = cand;
-    this.cl = [0, 1, 2, 3, 4, 5].map(() => { const l = new THREE.PointLight(0xffa850, 4, 7, 1.6); r.add(l); return l; });
+    this.cl = [0, 1, 2, 3, 4, 5].map(() => { const l = new THREE.PointLight(0xffa850, 4, 4, 1.8); r.add(l); return l; });
     // luz del salon
     this.hallFire = new THREE.PointLight(0xff9a40, 18, 22, 1.4); this.hallFire.position.set(31, 2, -5); r.add(this.hallFire);
     this.hallWin = new THREE.SpotLight(0xbcc8dc, 60, 30, 0.5, 0.6, 1.2); this.hallWin.position.set(12.5, 5, -12); this.hallWin.target.position.set(15, 0, -4); r.add(this.hallWin); r.add(this.hallWin.target);
     this.amb = new THREE.HemisphereLight(0x6a6a78, 0x1a1410, 0.5); r.add(this.amb);
-    this.passLight = new THREE.DirectionalLight(0xaab4c8, 1.2); this.passLight.position.set(-5, 20, 15); r.add(this.passLight);
+    this.passLight = new THREE.DirectionalLight(0xaab4c8, 1.2); this.passLight.position.set(-15, 20, 6); r.add(this.passLight);
     // arciano visto por el tunel (copia)
     this.treeSpot = new THREE.Group(); this.treeSpot.position.set(0, 0, 16); r.add(this.treeSpot);
   }
   attachTree(trunkGeo, trunkMat, leafGeo, leafMat) {
     const a = new THREE.Mesh(trunkGeo, mat('bark')), b = new THREE.Mesh(leafGeo, leafMat);
     a.scale.setScalar(0.7); b.scale.setScalar(0.7);
-    const l = new THREE.PointLight(0xc8d4ff, 30, 12, 1.5); l.position.set(1.5, 3, -2); this.treeSpot.add(l);
+    const l = new THREE.PointLight(0xc8d4ff, 7, 10, 1.5); l.position.set(1.5, 3, -2); this.treeSpot.add(l);
     this.treeSpot.add(a); this.treeSpot.add(b);
   }
   update(lt, cam, st) {

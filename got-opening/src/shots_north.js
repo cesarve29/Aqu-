@@ -61,8 +61,8 @@ export const NORTH_SHOTS = [
   {
     t0: 29.905, t1: 35.95, f: (lt) => {
       const T = lt + 29.9;
-      const pos = spline(T, [[29.9, [5.6, 4.2, 40.2]], [31.0, [6.0, 3.4, 39.6]], [32.2, [7.2, 1.6, 38.0]], [33.0, [8.4, 0.4, 36.9]], [35.0, [8.9, 0.42, 37.0]], [35.95, [9.3, 0.5, 37.6]]]);
-      const look = spline(T, [[29.9, [9.2, 0.6, 34.5]], [31.0, [9.2, 0.9, 34.5]], [32.2, [9.2, 1.2, 34.5]], [33.0, [9.4, 1.5, 34.5]], [35.0, [9.0, 1.5, 34.5]], [35.95, [8.8, 1.5, 34.5]]]);
+      const pos = spline(T, [[29.9, [5.6, 4.2, 40.2]], [31.0, [6.0, 3.4, 39.6]], [32.2, [7.2, 1.6, 38.0]], [33.0, [10.6, 0.45, 38.0]], [35.0, [10.8, 0.5, 38.3]], [35.95, [11.0, 0.6, 38.6]]]);
+      const look = spline(T, [[29.9, [9.2, 0.6, 34.5]], [31.0, [9.2, 0.9, 34.5]], [32.2, [9.2, 1.2, 34.5]], [33.0, [9.9, 1.3, 34.5]], [35.0, [9.9, 1.3, 34.5]], [35.95, [9.8, 1.3, 34.5]]]);
       return base({
         cam: { pos, look, fov: 42 },
         aperture: 0.002, maxblur: 0.012, fog: 0.004,
@@ -80,7 +80,7 @@ export const NORTH_SHOTS = [
       return base({
         cam: { pos, look, fov: 44 }, sky: { ...NSKY, cloud: 0.6 }, fog: 0.03, fogCol: 0x1a1612,
         aperture: 0.002, maxblur: 0.012, sat: 0.75, tint: [1.05, 1.0, 0.94],
-        exposure: 1.3, state: { inside: true, amb: 1.0, pass: 3.0, fire: 3, win: 20 },
+        exposure: 1.4, state: { inside: true, amb: 2.0, pass: 3.5, fire: 2, win: 20 },
       });
     },
   },
@@ -94,7 +94,7 @@ export const NORTH_SHOTS = [
         cam: { pos, look, fov: 46 }, skyOn: false, fog: 0.035, fogCol: 0x1a140f,
         aperture: 0.0025, maxblur: 0.014, sat: 0.75, tint: [1.08, 1.0, 0.9], exposure: 1.2,
         fade: kf(T, [[46.3, 1], [47.0, 0.15]]),
-        state: { inside: true, amb: 0.6, fire: 6, win: 90 },
+        state: { inside: true, amb: 0.9, fire: 4, win: 160 },
       });
     },
   },
@@ -108,7 +108,7 @@ export const NORTH_SHOTS = [
         cam: { pos, look, fov: 46 }, skyOn: false, fog: 0.09, fogCol: 0x0e0b09,
         aperture: 0.002, maxblur: 0.012, sat: 0.7, tint: [1.08, 0.98, 0.88], exposure: 1.0,
         fade: kf(T, [[47.17, 0.2], [47.8, 1], [52.4, 1], [53.35, 0]]),
-        state: { inside: true, amb: 0.06, fire: 0, win: 0, candle: 2.5 },
+        state: { inside: true, amb: 0.04, fire: 0, win: 0, candle: 1.4 },
       });
     },
   },
