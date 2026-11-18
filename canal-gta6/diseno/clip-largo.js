@@ -4,6 +4,8 @@
 //   salida, titulo: "texto (admite <br>)", credito: "🎥 Vídeo original: IGN",
 //   partes: [[ini, fin], ...]          // tramos del vídeo original (s); se unen con un fundido suave
 //   subtitulos: [[ini, fin, "texto", "amarillo"?]]  // tiempos del vídeo ORIGINAL; 4º campo opcional: color
+//   reacciones: [[ini, fin], ...]       // opcional: la cámara del streamer aparece en grande debajo del vídeo
+//   camara: [{hasta: s, recorte: "w:h:x:y"}, {recorte: ...}]  // dónde está la facecam en el original (por tramos de tiempo)
 //   recorte: "w:h:x:y"                  // opcional, zona del original que se muestra (por defecto 1440:1080:240:0, centro de 1080p)
 // }
 // Formato 1440x2560: título arriba, vídeo 1440x1080 a resolución nativa (centro del 16:9),
@@ -33,7 +35,7 @@ async function overlay(file) {
     font:56px/1.05 Anton,sans-serif;color:#fff;-webkit-text-stroke:7px #120626;paint-order:stroke fill;text-shadow:0 0 18px #ff3fb4,0 5px 0 #120626}
   .titulo .a{color:#ffe066}
   .linea{position:absolute;left:0;right:0;height:3px;background:#ff3fb4;box-shadow:0 0 10px #ff3fb4}
-  .credito{position:absolute;left:0;right:0;top:${(VY + VH) / 2 + 195}px;text-align:center;font:800 17px Montserrat,sans-serif;color:#fff;opacity:.9;text-shadow:0 1px 4px #000}
+  .credito{position:absolute;left:0;right:0;top:${cfg.reacciones ? H / 2 - 42 : (VY + VH) / 2 + 195}px;text-align:center;font:800 17px Montserrat,sans-serif;color:#fff;opacity:.9;text-shadow:0 1px 4px #000}
   </style></head><body>
   <div class="marca">SEIS EN <b>Vice</b></div>
   <div class="titulo"><div>${cfg.titulo}</div></div>
@@ -60,11 +62,22 @@ function ass(file, subs) {
   const png = path.join(tmp, 'ov.png');
   await overlay(png);
   // tramos -> cada uno a su archivo; se unen con fundido
+  // facecam en grande (zona inferior, 1360 px de ancho con borde rosa neón)
+  const CW = 1360, CY = VY + VH + 40;
+  const camEn = (t) => (cfg.camara || []).find(c => c.hasta === undefined || t < c.hasta);
   const partes = cfg.partes.map(([a, b], i) => {
     const out = path.join(tmp, `p${i}.mp4`);
+    const rs = (cfg.reacciones || []).map(([r0, r1]) => [Math.max(r0, a) - a, Math.min(r1, b) - a, camEn(r0)]).filter(([r0, r1]) => r1 - r0 > 0.5);
+    let cams = '', ult = '[o0]';
+    rs.forEach(([r0, r1, c], k) => {
+      cams += `[c${k}]crop=${c.recorte},scale=${CW - 16}:-2:flags=lanczos,unsharp=5:5:0.6,pad=iw+16:ih+16:8:8:color=0xff3fb4,format=yuva420p,` +
+        `fade=in:st=${r0.toFixed(2)}:d=0.12:alpha=1,fade=out:st=${(r1 - 0.12).toFixed(2)}:d=0.12:alpha=1[z${k}];` +
+        `${ult}[z${k}]overlay=${(W - CW) / 2}:${CY}:enable='between(t,${r0.toFixed(2)},${r1.toFixed(2)})'[o${k + 1}];`;
+      ult = `[o${k + 1}]`;
+    });
     ff(['-ss', String(a), '-t', String(b - a), '-i', SRC, '-filter_complex',
-      `[0:v]fps=30,split[x][y];[x]scale=360:640:force_original_aspect_ratio=increase,crop=360:640,boxblur=10:2,scale=${W}:${H},eq=brightness=-0.2:saturation=1.2[bg];` +
-      `[y]crop=${cfg.recorte || '1440:1080:240:0'},scale=1440:1080:flags=lanczos,eq=saturation=1.08[v];[bg][v]overlay=0:${VY},setsar=1,format=yuv420p[o];` +
+      `[0:v]fps=30,split=${2 + rs.length}[x][y]${rs.map((_, k) => `[c${k}]`).join('')};[x]scale=360:640:force_original_aspect_ratio=increase,crop=360:640,boxblur=10:2,scale=${W}:${H},eq=brightness=-0.2:saturation=1.2[bg];` +
+      `[y]crop=${cfg.recorte || '1440:1080:240:0'},scale=1440:1080:flags=lanczos,eq=saturation=1.08[v];[bg][v]overlay=0:${VY}[o0];` + cams + `${ult}setsar=1,format=yuv420p[o];` +
       `[0:a]aresample=48000,aformat=channel_layouts=stereo[ao]`,
       '-map', '[o]', '-map', '[ao]', '-c:v', 'libx264', '-crf', '15', '-preset', 'fast', '-c:a', 'pcm_s16le', out]);
     return out;
@@ -82,7 +95,7 @@ function ass(file, subs) {
     const m = s + (e - s) * (k / t.length);
     partir(s, m, t.slice(0, k), c); partir(m, e, t.slice(k + 1), c);
   };
-  for (const [s, e, t, c] of cfg.subtitulos) partir(s, e, t, c);
+  for (const [s, e, t, c] of cfg.subtitulos || []) partir(s, e, t, c);
   const subs = [];
   for (const [s, e, t, c] of cortos) {
     cfg.partes.forEach(([a, b], i) => {
@@ -105,7 +118,9 @@ function ass(file, subs) {
   // cierre + efectos suaves solo en el cierre
   const TOTAL = DUR + 2;
   const sfx = path.join(tmp, 'sfx.wav');
-  mezclar([{ t: DUR - 0.05, sfx: 'whoosh', gain: 0.6, variante: 3 }, { t: DUR + 0.05, sfx: 'neon', gain: 0.5, variante: 1 },
+  const golpes = [];
+  for (const [r0] of cfg.reacciones || []) cfg.partes.forEach(([a, b], i) => { if (r0 >= a && r0 < b) golpes.push({ t: r0 - a + offs[i] - 0.05, sfx: 'whoosh', gain: 0.5, variante: 2 }, { t: r0 - a + offs[i], sfx: 'pop', gain: 0.5, variante: 2 }); });
+  mezclar([...golpes, { t: DUR - 0.05, sfx: 'whoosh', gain: 0.6, variante: 3 }, { t: DUR + 0.05, sfx: 'neon', gain: 0.5, variante: 1 },
     { t: DUR + 0.25, sfx: 'impacto', gain: 0.7, variante: 3 }, { t: DUR + 0.55, sfx: 'pop', gain: 0.6, variante: 1 }], TOTAL, sfx);
   const outDir = path.join(ROOT, 'clips', 'final');
   fs.mkdirSync(outDir, { recursive: true });
