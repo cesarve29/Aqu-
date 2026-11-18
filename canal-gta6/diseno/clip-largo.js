@@ -73,13 +73,14 @@ function ass(file, subs) {
   const DUR = acc;
   // frases largas -> se dividen en dos subtítulos seguidos (máx. ~2 líneas en pantalla)
   const MAX = 40, cortos = [];
-  for (const [s, e, t] of cfg.subtitulos) {
-    if (t.length <= MAX) { cortos.push([s, e, t]); continue; }
+  const partir = (s, e, t) => {
+    if (t.length <= MAX) { cortos.push([s, e, t]); return; }
     const mid = t.length / 2; let k = -1;
     for (let i = 0; i < t.length; i++) if (t[i] === ' ' && (k < 0 || Math.abs(i - mid) < Math.abs(k - mid))) k = i;
-    const f = k / t.length, m = s + (e - s) * f;
-    cortos.push([s, m, t.slice(0, k)], [m, e, t.slice(k + 1)]);
-  }
+    const m = s + (e - s) * (k / t.length);
+    partir(s, m, t.slice(0, k)); partir(m, e, t.slice(k + 1));
+  };
+  for (const [s, e, t] of cfg.subtitulos) partir(s, e, t);
   const subs = [];
   for (const [s, e, t] of cortos) {
     cfg.partes.forEach(([a, b], i) => {

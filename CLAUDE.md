@@ -32,6 +32,9 @@ Guía completa (títulos, descripciones, etiquetas, derechos): `canal-gta6/GUIA-
 9. **Material de otros creadores: dar SIEMPRE crédito.** En el vídeo (texto fijo "🎥 Vídeo original: <creador>",
    opción `credito` de `edit-short.js`) y en la descripción ("Vídeo original: <creador> – <título>").
 
+10. **Sin emojis en los textos grabados en el vídeo** (títulos de arriba, rótulos). Los emojis solo en
+   título/descripción de YouTube.
+
 ### Herramientas
 
 - Diseños y animaciones: `canal-gta6/diseno/` (`banner.js`, `avatar.js`, `intro.js`, `cuenta-atras.js`, `componer-cuenta-atras.js`).
