@@ -22,14 +22,16 @@ const ff = (args) => execFileSync('ffmpeg', ['-nostdin', '-y', '-loglevel', 'err
 // --- textos superpuestos (PNG transparentes) ---
 const CSS = `@import url('https://fonts.googleapis.com/css2?family=Anton&family=Montserrat:wght@800;900&family=Mr+Dafoe&display=swap');
 *{margin:0;padding:0;box-sizing:border-box}body{width:1080px;height:1920px;position:relative;background:transparent}
-.titulo{position:absolute;left:0;right:0;top:230px;text-align:center;font:150px/1 Anton,sans-serif;color:#fff;letter-spacing:.02em;
+.titulo{position:absolute;left:0;right:0;top:${cfg.banner ? 310 : 230}px;text-align:center;font:150px/1 Anton,sans-serif;color:#fff;letter-spacing:.02em;
   -webkit-text-stroke:14px #120626;paint-order:stroke fill;text-shadow:0 0 30px #ff3fb4,0 10px 0 #120626}
 .titulo .b{color:#ffe066}
 .etq{position:absolute;left:0;right:0;top:1380px;text-align:center}
-.etq span{display:inline-block;font:900 58px Montserrat,sans-serif;letter-spacing:.04em;color:#120626;background:#ffe066;
+.etq span{display:inline-block;white-space:nowrap;font:900 ${cfg.etiqueta_px || 58}px Montserrat,sans-serif;letter-spacing:.04em;color:#120626;background:#ffe066;
   padding:16px 34px;border-radius:16px;box-shadow:0 0 34px #ff3fb4aa,0 8px 0 #120626}
 .marca{position:absolute;left:0;right:0;top:120px;text-align:center;font:900 34px Montserrat,sans-serif;letter-spacing:.28em;color:#e9fdff;
   text-shadow:0 0 8px #34e1ff,0 0 20px #18b8ff,0 3px 6px #000}
+.banner{position:absolute;left:0;right:0;top:205px;text-align:center}
+.banner span{display:inline-block;font:900 44px Montserrat,sans-serif;letter-spacing:.12em;color:#fff;background:#e0102f;padding:10px 26px;border-radius:12px;box-shadow:0 0 30px #e0102faa,0 6px 0 #120626}
 .marca b{font:86px/0 'Mr Dafoe',cursive;letter-spacing:0;color:#fff;text-shadow:0 0 10px #ff3fb4,0 0 26px #ff2a8a;vertical-align:-6px;margin-left:4px}`;
 async function pngs(tmp) {
   const b = await chromium.launch();
@@ -40,7 +42,7 @@ async function pngs(tmp) {
     await p.screenshot({ path: file, omitBackground: true });
     return file;
   };
-  const out = { marca: await shot(`<div class="marca">SEIS EN <b>Vice</b></div>`, path.join(tmp, 'marca.png')) };
+  const out = { marca: await shot(`<div class="marca">SEIS EN <b>Vice</b></div>${cfg.banner ? `<div class="banner"><span>${cfg.banner}</span></div>` : ''}`, path.join(tmp, 'marca.png')) };
   out.titulo = await shot(`<div class="titulo">${cfg.titulo[0]}<br><span class="b">${cfg.titulo[1] || ''}</span></div>`, path.join(tmp, 'titulo.png'));
   out.etq = [];
   for (const [i, c] of cfg.clips.entries()) out.etq.push(c.texto ? await shot(`<div class="etq"><span>${c.texto}</span></div>`, path.join(tmp, `e${i}.png`)) : null);
@@ -50,11 +52,12 @@ async function pngs(tmp) {
 
 // --- cada clip: fondo desenfocado + vídeo grande fundido, zoom lento, audio original ---
 function clip(c, i, tmp, mask) {
-  const out = path.join(tmp, `c${i}.mp4`), n = Math.round(c.dur * 30);
+  const out = path.join(tmp, `c${i}.mp4`);
   ff(['-ss', String(c.t), '-t', String(c.dur), '-i', SRC, '-loop', '1', '-i', mask, '-filter_complex',
-    `[0:v]fps=30,eq=saturation=1.25:contrast=1.05,split[a][b];` +
-    `[a]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:2,eq=brightness=-0.12[bg];` +
-    `[b]scale=2667:1500,zoompan=z='1+0.05*on/${n}':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=2667x1500:fps=30,crop=1080:1500,format=rgba[fg0];` +
+    `[0:v]fps=30,hqdn3d=2:1.5:4:3,eq=saturation=1.22:contrast=1.05,split[a][b];` +
+    `[a]scale=270:480:force_original_aspect_ratio=increase,crop=270:480,boxblur=8:2,scale=1080:1920,eq=brightness=-0.12[bg];` +
+    `[b]scale=w='trunc(2667*(1+0.05*min(t/${c.dur},1))/2)*2':h='trunc(1500*(1+0.05*min(t/${c.dur},1))/2)*2':eval=frame:flags=lanczos,` +
+    `crop=1080:1500,unsharp=5:5:0.8:5:5:0,format=rgba[fg0];` +
     `[1:v]format=gray,scale=1080:1500[m];[fg0][m]alphamerge[fg];[bg][fg]overlay=0:210:shortest=1,setsar=1,format=yuv420p[v];` +
     `[0:a]aresample=48000,aformat=channel_layouts=stereo,apad=whole_dur=${c.dur}[a0]`,
     '-map', '[v]', '-map', '[a0]', '-t', String(c.dur), '-c:v', 'libx264', '-crf', '17', '-r', '30', '-c:a', 'pcm_s16le', out]);
@@ -108,9 +111,10 @@ function clip(c, i, tmp, mask) {
   fs.mkdirSync(outDir, { recursive: true });
   const out = path.join(outDir, cfg.salida);
   ff(['-i', cuerpo, '-i', CIERRE, '-i', sfx, '-filter_complex',
-    `[0:v]setsar=1[v0];[1:v]fps=30,scale=1080:1920,setsar=1,format=yuv420p[v1];[v0][v1]concat=n=2:v=1:a=0[v];` +
+    // salida 1440x2560: YouTube le da más calidad
+    `[0:v]scale=1440:2560:flags=lanczos,setsar=1[v0];[1:v]fps=30,scale=1440:2560:flags=lanczos,setsar=1,format=yuv420p[v1];[v0][v1]concat=n=2:v=1:a=0[v];` +
     `[0:a]apad=whole_dur=${TOTAL}[ca];[2:a]volume=${VOL_SFX}[fx];[ca][fx]amix=inputs=2:normalize=0,loudnorm=I=-15:TP=-1.5:LRA=11[a]`,
-    '-map', '[v]', '-map', '[a]', '-t', String(TOTAL), '-c:v', 'libx264', '-crf', '19', '-pix_fmt', 'yuv420p',
+    '-map', '[v]', '-map', '[a]', '-t', String(TOTAL), '-c:v', 'libx264', '-crf', '16', '-preset', 'slow', '-pix_fmt', 'yuv420p',
     '-c:a', 'aac', '-b:a', '256k', '-ar', '48000', '-movflags', '+faststart', out]);
   fs.rmSync(tmp, { recursive: true });
   console.log('ok', out, TOTAL.toFixed(1) + 's');

@@ -1,0 +1,16 @@
+{
+  "salida": "ya-disponible.mp4",
+  "banner": "🔴 ÚLTIMA HORA",
+  "etiqueta_px": 44,
+  "titulo": ["¡GTA 6 YA ESTÁ", "DISPONIBLE! 🔥"],
+  "transicion": 0.3,
+  "clips": [
+    { "t": 1573.9, "dur": 2.3, "texto": "" },
+    { "t": 534.0,  "dur": 2.4, "texto": "🇳🇿 NUEVA ZELANDA YA LO JUEGA" },
+    { "t": 816.2,  "dur": 2.4, "texto": "🇦🇺 AUSTRALIA, LA SIGUIENTE" },
+    { "t": 950.1,  "dur": 2.4, "texto": "🔴 STREAMERS FAMOSOS EN DIRECTO" },
+    { "t": 1170.5, "dur": 2.4, "texto": "¡VE A VER AL TUYO YA MISMO! 👀" },
+    { "t": 544.2,  "dur": 2.3, "texto": "🕛 EN TU PAÍS: ESTA MEDIANOCHE" },
+    { "t": 1179.0, "dur": 2.6, "texto": "¿YA LO PRECARGASTE? 👇" }
+  ]
+}
