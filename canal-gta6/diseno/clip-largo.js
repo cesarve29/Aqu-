@@ -48,7 +48,7 @@ function ass(file, subs) {
   // subtítulos debajo del vídeo: Montserrat Black, blanco con borde negro, máx. 2 líneas
   const head = `[Script Info]\nScriptType: v4.00+\nPlayResX: ${W}\nPlayResY: ${H}\nWrapStyle: 0\n\n[V4+ Styles]\n` +
     `Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n` +
-    `Style: Sub,Montserrat Black,76,&H00FFFFFF,&H00FFFFFF,&H00260612,&H64000000,0,0,0,0,100,100,0,0,1,7,3,8,70,70,${VY + VH + 40},1\n\n` +
+    `Style: Sub,Montserrat Black,140,&H00FFFFFF,&H00FFFFFF,&H00260612,&H64000000,0,0,0,0,100,100,0,0,1,11,5,8,50,50,${VY + VH + 40},1\n\n` +
     `[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
   fs.writeFileSync(file, head + subs.map(([a, b, t]) => `Dialogue: 0,${ts(a)},${ts(b)},Sub,,0,0,0,,{\\fad(60,60)}${t.replace(/\n/g, '\\N')}`).join('\n') + '\n');
 }
@@ -71,8 +71,17 @@ function ass(file, subs) {
   const offs = []; let acc = 0;
   cfg.partes.forEach(([a, b], i) => { offs.push(acc); acc += (b - a) - (i < cfg.partes.length - 1 ? XF : 0); });
   const DUR = acc;
-  const subs = [];
+  // frases largas -> se dividen en dos subtítulos seguidos (máx. ~2 líneas en pantalla)
+  const MAX = 40, cortos = [];
   for (const [s, e, t] of cfg.subtitulos) {
+    if (t.length <= MAX) { cortos.push([s, e, t]); continue; }
+    const mid = t.length / 2; let k = -1;
+    for (let i = 0; i < t.length; i++) if (t[i] === ' ' && (k < 0 || Math.abs(i - mid) < Math.abs(k - mid))) k = i;
+    const f = k / t.length, m = s + (e - s) * f;
+    cortos.push([s, m, t.slice(0, k)], [m, e, t.slice(k + 1)]);
+  }
+  const subs = [];
+  for (const [s, e, t] of cortos) {
     cfg.partes.forEach(([a, b], i) => {
       const s2 = Math.max(s, a), e2 = Math.min(e, b);
       if (e2 - s2 > 0.15) subs.push([s2 - a + offs[i], e2 - a + offs[i], t]);
@@ -88,7 +97,7 @@ function ass(file, subs) {
   const N = partes.length;
   g += `${fv}[${N}:v]overlay=0:0:shortest=1,ass=${assFile}:fontsdir=${path.join(__dirname, 'fuentes')},format=yuv420p[vc]`;
   const cuerpo = path.join(tmp, 'cuerpo.mp4');
-  ff([...partes.flatMap(p => ['-i', p]), '-loop', '1', '-i', png, '-filter_complex', g, '-map', '[vc]', '-map', fa,
+  ff([...partes.flatMap(p => ['-i', p]), '-loop', '1', '-i', png, '-filter_complex', g, '-map', '[vc]', '-map', partes.length === 1 ? '0:a' : fa,
     '-t', String(DUR), '-c:v', 'libx264', '-crf', '15', '-preset', 'fast', '-c:a', 'pcm_s16le', cuerpo]);
   // cierre + efectos suaves solo en el cierre
   const TOTAL = DUR + 2;
