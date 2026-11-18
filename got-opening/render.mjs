@@ -33,12 +33,14 @@ const browser = await chromium.launch({
 const page = await browser.newPage({ viewport: { width: W, height: H } });
 page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning' || args.verbose) console.log('[page]', m.text()); });
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
-await page.goto(`http://127.0.0.1:${port}/index.html?w=${W}&h=${H}&debug=${args.debug || ''}`, { waitUntil: 'commit' });
+await page.goto(`http://127.0.0.1:${port}/index.html?w=${W}&h=${H}&ms=${args.ms ?? 0}&debug=${args.debug || ''}`, { waitUntil: 'commit' });
 const tInit = Date.now();
 await page.waitForFunction(() => window.ready === true, null, { timeout: 900000, polling: 500 });
 console.log('scene ready in', ((Date.now() - tInit) / 1000).toFixed(1), 's');
 
-if (args.stills) {
+if (args.info) {
+  for (const ts of String(args.info).split(',')) { const t0 = Date.now(); await page.evaluate((t) => window.renderPNG(t), +ts); const i = await page.evaluate(() => window.info()); console.log(ts, JSON.stringify(i), Date.now() - t0, 'ms'); }
+} else if (args.stills) {
   const cams = args.cam ? String(args.cam).split(';').map((c) => c.split(',').map(Number)) : [null];
   for (const ts of String(args.stills).split(',')) for (let ci = 0; ci < cams.length; ci++) {
     const t = +ts, cam = cams[ci];
@@ -52,8 +54,9 @@ if (args.stills) {
   const from = +(args.from || 0), to = +(args.to || 5);
   const f0 = Math.round(from * FPS), f1 = Math.round(to * FPS);
   const out = path.join(HERE, args.out || `out/part_${f0}_${f1}.mp4`);
+  const outTmp = out.replace(/\.mp4$/, '.tmp.mp4');
   const ff = spawn('ffmpeg', ['-y', '-hide_banner', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${W}x${H}`, '-r', String(FPS), '-i', '-',
-    '-vf', 'vflip', '-c:v', 'libx264', '-preset', 'medium', '-crf', String(args.crf || 17), '-pix_fmt', 'yuv420p', out], { stdio: ['pipe', 'inherit', 'inherit'] });
+    '-vf', 'vflip', '-c:v', 'libx264', '-preset', 'medium', '-crf', String(args.crf || 17), '-pix_fmt', 'yuv420p', outTmp], { stdio: ['pipe', 'inherit', 'inherit'] });
   const tStart = Date.now();
   for (let f = f0; f < f1; f++) {
     const b64 = await page.evaluate(([t, f]) => window.renderFrame(t, f), [f / FPS, f]);
@@ -66,6 +69,7 @@ if (args.stills) {
   }
   ff.stdin.end();
   await new Promise((r) => ff.on('close', r));
+  fs.renameSync(outTmp, out);
   console.log('wrote', out, ((Date.now() - tStart) / 1000).toFixed(1), 's');
 }
 await browser.close();

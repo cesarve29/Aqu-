@@ -1,6 +1,6 @@
 // Set del Sur: mapa con Desembarco del Rey, puerta, ciudad, Fortaleza Roja, mecanismo de torre y salones del trono.
 import { THREE, Grid, vox, mat, sd, hash3, rng, clamp, lerp, jitter, shade, mix, emoji } from './kit.js';
-import { mapGround, instanced, pineGeometry, label, gearGrid, cloudTexture } from './props.js';
+import { mapGround, instanced, pineGeometry, pineBoxes, label, gearGrid, cloudTexture } from './props.js';
 
 export const SI = [500, 0, 0]; // mecanismo + salon de engranajes
 export const SN = [700, 0, 0]; // nave con vidriera
@@ -17,18 +17,18 @@ const GOLD = 0xc0964a;
 
 // ciudad ovalada: murallas, calles radiales y casas
 function buildCity() {
-  const v = 0.1, NX = 380, NY = 24, NZ = 240;
+  const v = 0.06, NX = 634, NY = 30, NZ = 400;
   const g = new Grid(NX, NY, NZ);
-  const cx = 190, cz = 120;
+  const cx = 317, cz = 200;
   const R = rng(4);
   for (let x = 0; x < NX; x++) for (let z = 0; z < NZ; z++) {
-    const dx = (x + 0.5 - cx) / 185, dz = (z + 0.5 - cz) / 115;
+    const dx = (x + 0.5 - cx) / 308, dz = (z + 0.5 - cz) / 192;
     const r = Math.hypot(dx, dz);
     if (r > 1) continue;
     // suelo de la ciudad
     g.set(x, 0, z, hash3(x >> 2, 0, z >> 2) < 0.5 ? 0x5a4636 : 0x4e3c2e);
     // muralla
-    if (r > 0.965) { const h = 9 + ((x + z) % 6 < 3 ? 2 : 0); for (let y = 1; y < h; y++) g.set(x, y, z, red(x, y, z)); continue; }
+    if (r > 0.975) { const h = 14 + ((x + z) % 8 < 4 ? 3 : 0); for (let y = 1; y < h; y++) g.set(x, y, z, red(x, y, z)); continue; }
     // calles radiales y anillo
     const a = Math.atan2(dz, dx);
     const street = Math.abs(Math.sin(a * 4)) < 0.05 || Math.abs(r - 0.6) < 0.015;
@@ -116,11 +116,11 @@ export function ironThrone(v = 0.03, big = false) {
     g.box(cx - 18, 9, cz - 15, cx + 18, 16, cz + 15, col);
     g.box(cx - 11, 17, cz - 10, cx + 11, 26, cz + 10, col);
     g.box(cx - 15, 17, cz - 10, cx - 11, 38, cz + 12, col); g.box(cx + 11, 17, cz - 10, cx + 15, 38, cz + 12, col);
-    g.box(cx - 12, 26, cz - 12, cx + 12, 60, cz - 8, col);
+    g.box(cx - 12, 26, cz - 12, cx + 12, 46, cz - 8, col);
   }
   const R = rng(17);
   const nS = big ? 70 : 46;
-  const by = big ? 30 : 46, bz = big ? cz : cz - 10;
+  const by = big ? 30 : 38, bz = big ? cz : cz - 10;
   for (let k = 0; k < nS; k++) {
     const a = -1.35 + (k / (nS - 1)) * 2.7 + (R() - 0.5) * 0.06;
     const L = (big ? 150 : 50) * (0.55 + R() * 0.45) * (1 - Math.abs(a) * 0.3);
@@ -179,7 +179,7 @@ function windowMesh() {
     if (!lead) g.setE(i, j, 0, 255);
     if (lead) g.set(i, j, 1, 0x2a1a12);
   }
-  return vox(g, v, [W / 2, 0, 1], 'glass', { roughness: 0.4, emiGain: 0.65, emiTint: 0xffffff });
+  return vox(g, v, [W / 2, 0, 1], 'glass', { roughness: 0.4, emiGain: 0.35, emiTint: 0xffffff });
 }
 
 function skullGrid() {
@@ -223,7 +223,7 @@ export class South {
       if (hash3(Math.floor(x / 5), 3, Math.floor(z / 5)) < 0.55) continue;
       pts.push([x, 0, z, R() * 6, 0.9 + R() * 0.4]);
     }
-    this.pines = instanced(pineGeometry(false, 0x2c3a26), 0.07, [3.5, 0, 3.5], 'pineS', pts); out.add(this.pines);
+    this.pines = instanced(pineBoxes(false, 0x2c3a26), 0, null, 'pineS', pts); out.add(this.pines);
     // puerta: dos torres que se elevan + engranajes
     this.gate = new THREE.Group(); this.gate.position.set(17, 0, 6); this.gate.rotation.y = -0.45; out.add(this.gate);
     this.towers = [-1, 1].map((s) => { const m = gateTowerGrid(); m.position.set(0, 0, s * 1.6); this.gate.add(m); return m; });
@@ -299,7 +299,7 @@ export class South {
         for (let y = 0; y < 4; y++) g4(rg, x, y, z, Math.floor(a * 9) % 7 === 0 && y === 3 ? 0xffe0a0 : RED[(Math.floor(a * 8) + 8) % 4]);
       }
       rg.paint((x, y, z, col) => { if (col === 0xffe0a0) rg.setE(x, y, z, 255); return col; });
-      const m = vox(rg, 0.045, [22, 0, 22], 'shaftring', { emiGain: 0.8, emiTint: 0xffd090 }); m.position.y = 5.5 - k * 0.65; this.shaft.add(m);
+      const m = vox(rg, 0.045, [22, 0, 22], 'shaftring', { emiGain: 0.4, emiTint: 0xffd090 }); m.position.y = 5.5 - k * 0.65; this.shaft.add(m);
     }
     // sala de engranajes con el trono (bajo el pozo, y = -12)
     this.throneHallA = new THREE.Group(); this.throneHallA.position.set(0, -12, 0); I.add(this.throneHallA);
@@ -311,6 +311,7 @@ export class South {
     hg.box(0, 0, 155, 199, 109, 159, red); hg.box(0, 0, 0, 199, 109, 3, (x, y, z) => shade(red(x, y, z), (x >> 3) % 2 ? 0.32 : 0.4)); hg.box(0, 0, 0, 4, 109, 159, red); hg.box(195, 0, 0, 199, 109, 159, red);
     // tarima del trono al fondo (z bajo)
     hg.box(70, 1, 4, 130, 6, 30, (x, y, z) => shade(red(x, y, z), 0.6)); hg.box(78, 7, 4, 122, 10, 22, (x, y, z) => shade(red(x, y, z), 0.6));
+    hg.paint((x, y, z, c) => (y > 0 ? shade(c, 0.55) : shade(c, 0.7)));
     const hm = vox(hg, 0.1, [hcx, 0, hcz], 'hallA', { roughness: 0.8 }); this.throneHallA.add(hm);
     // engranajes gigantes en las paredes
     this.wallGears = [];
@@ -324,8 +325,8 @@ export class South {
     for (const s of [-1, 1]) { const m = vox(sk, 0.06, [10, 0, 9], 'bone'); m.position.set(s * 3.2, 0.1, -1.2); m.rotation.y = s > 0 ? Math.PI * 0.85 : Math.PI * 0.15; this.throneHallA.add(m); }
     this.aLight = new THREE.SpotLight(0xffd8a8, 40, 30, 0.5, 0.7, 1.3); this.aLight.position.set(0, 9, 3); this.aLight.target = this.thA; this.throneHallA.add(this.aLight);
     this.aAmb = new THREE.HemisphereLight(0x8a7462, 0x1a120c, 0.5); I.add(this.aAmb);
-    for (const sx of [-1, 1]) { const l = new THREE.PointLight(0xffb070, 35, 12, 1.6); l.position.set(sx * 7.5, 3, 1.5); this.throneHallA.add(l); }
-    this.mechSun = new THREE.DirectionalLight(0xffe0c0, 1.6); this.mechSun.position.set(5, 20, 8); I.add(this.mechSun);
+    for (const sx of [-1, 1]) { const l = new THREE.PointLight(0xffb070, 12, 12, 1.6); l.position.set(sx * 7.5, 3, 1.5); this.throneHallA.add(l); }
+    this.mechSun = new THREE.DirectionalLight(0xffe0c0, 1.6); this.mechSun.position.set(5, 20, 8); I.add(this.mechSun); I.add(this.mechSun.target);
   }
 
   buildNave(N) {

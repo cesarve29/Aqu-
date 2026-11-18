@@ -38,21 +38,21 @@ export class Poster {
       for (let z = 0; z < 5; z++) lg.set(i, j, z, jitter(col, 0.1, i, j, z));
     }
     this.letters = vox(lg, lv, [LX / 2, LY / 2, 0], 'gotL', { roughness: 0.25, metalness: 0.85 });
-    this.letters.position.set(-1.24, 2.45, 1.2); this.letters.scale.setScalar(0.85); this.root.add(this.letters);
+    this.letters.position.set(-1.24, 2.2, 1.2); this.letters.scale.setScalar(0.85); this.root.add(this.letters);
     // ojos de dragon
     const eg = new Grid(16, 9, 2);
     for (let i = 0; i < 16; i++) for (let j = 0; j < 9; j++) {
       const dx = (i - 7.5) / 8, dy = (j - 4) / 4.5;
       if (dx * dx + dy * dy > 1) continue;
       const pupil = Math.abs(i - 7.5) < 1.3;
-      eg.set(i, j, 0, pupil ? 0x200404 : 0xd8401a); if (!pupil) eg.setE(i, j, 0, 220);
+      eg.set(i, j, 0, pupil ? 0x200404 : 0xb02810); if (!pupil) eg.setE(i, j, 0, 160);
     }
     this.eyes = [[-2.17, -0.55], [0.15, -0.55]].map(([x, y], i) => { const m = vox(eg, 0.025, [8, 4.5, 0], 'eye', { emiGain: 2.5, emiTint: 0xff5020 }); m.position.set(x, y, 0.75); m.rotation.z = i ? -0.2 : 0.2; this.root.add(m); return m; });
     this.key = new THREE.DirectionalLight(0xdfe6f0, 2.4); this.key.position.set(-3, 5, 6); this.root.add(this.key);
     this.rim = new THREE.DirectionalLight(0xffc8a0, 1.0); this.rim.position.set(4, 2, -3); this.root.add(this.rim);
     this.amb = new THREE.HemisphereLight(0x6a7080, 0x0a0a0a, 0.5); this.root.add(this.amb);
     this.letterLight = new THREE.PointLight(0xffd0b0, 6, 6, 1.5); this.letterLight.position.set(-1.2, 2.8, 2.5); this.root.add(this.letterLight);
-    this.eyeLight = new THREE.PointLight(0xff4010, 3, 2.5, 1.5); this.eyeLight.position.set(-1.0, -0.5, 1.2); this.root.add(this.eyeLight);
+    
   }
   update() {}
 }

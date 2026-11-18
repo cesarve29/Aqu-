@@ -81,7 +81,7 @@ export function drawCredits(ctx2, W, H, t) {
     // ligera deriva como en el original
     const drift = (t - t0) * 0.004;
     let y = y0 * H;
-    const fs = H * 0.04; // tamano del nombre
+    const fs = H * 0.047; // tamano del nombre
     const isz = Math.round(fs * 1.15);
     lines.forEach(([ic, title, name, dx = 0, style], li) => {
       if (li > 0) y += fs * 1.75;

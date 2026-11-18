@@ -1,6 +1,6 @@
 // Set del Norte: mapa nevado, el Muro roto, el Ultimo Hogar, el camino e Invernalia con el arciano.
 import { THREE, Grid, vox, mat, sd, hash3, rng, clamp, lerp, jitter, shade, mix, smooth } from './kit.js';
-import { mapGround, pineGeometry, instanced, label, gearGrid, cloudTexture } from './props.js';
+import { mapGround, pineGeometry, pineBoxes, instanced, label, gearGrid, cloudTexture } from './props.js';
 import { NorthInteriors } from './north_int.js';
 
 export const WALL_Z = -40, LH = [0, 0, -15], WF = [4, 0, 34];
@@ -30,8 +30,8 @@ function buildWall() {
       const ad = Math.abs(bxu) - gap;
       if (ad > 0) {
         // los extremos rotos pierden grosor (perfil en piramide escalonada)
-        const endK = Math.min(1, 0.35 + ad / 7);
-        const hz = Math.round(half * endK + (hash3(y, x, 9) < 0.15 ? 0.6 : 0));
+        const endK = Math.min(1, 0.5 + ad / 6);
+        const hz = Math.max(2, Math.round(half * endK));
         const base = mix(0xd2d7dc, 0x9aa2aa, hash3(y >> 1, x, 2) * 0.8);
         const k = 0.88 + hash3(y, x, 1) * 0.18;
         for (let xx = x; xx < x + len; xx++) for (let z = cz - hz; z <= cz + hz; z++) {
@@ -165,7 +165,7 @@ function buildWinterfell() {
   const bx = cx - 34, bz = cz - 26;
   g.sdf((x, y, z) => Math.max(Math.hypot(x - bx, z - bz) - 6, y - 22 - (x - bx) * 0.4), st, [bx - 7, 0, bz - 7, bx + 7, 28, bz + 7]);
   // edificios con tejado a dos aguas
-  const builds = [[-55, -20, 10, 8, 10], [-52, 8, 12, 7, 12], [-30, 18, 14, 9, 11], [-10, 26, 9, 7, 9], [-14, -6, 10, 12, 12], [12, 20, 10, 8, 10], [30, 10, 7, 9, 9], [-40, 30, 9, 6, 8], [-62, 30, 6, 6, 8], [6, -36, 9, 6, 9]];
+  const builds = [[-55, -20, 10, 8, 10], [-52, 8, 12, 7, 12], [-30, 18, 14, 9, 11], [-10, 26, 9, 7, 9], [-14, -6, 10, 12, 12], [12, 20, 10, 8, 10], [-40, 30, 9, 6, 8], [-62, 30, 6, 6, 8], [6, -36, 9, 6, 9]];
   for (const [ox, oz, hx, hz, h] of builds) {
     const x0 = cx + ox, z0 = cz + oz;
     g.box(x0 - hx, 1, z0 - hz, x0 + hx, h, z0 + hz, wd);
@@ -262,16 +262,16 @@ export class North {
     this.root = new THREE.Group(); scene.add(this.root);
     const r = this.out = new THREE.Group(); this.root.add(r);
     ctx.renderer.localClippingEnabled = true;
-    this.ground = mapGround({ landGLSL: LAND_GLSL, tile: 1.0, land: 0x9a9fa4, land2: 0x6c7176, sea: 0x0c1826, sea2: 0x1a3048 }); r.add(this.ground);
+    this.ground = mapGround({ landGLSL: LAND_GLSL, tile: 1.0, land: 0xb0b4b8, land2: 0x82878c, sea: 0x0c1826, sea2: 0x1a3048 }); r.add(this.ground);
     this.wall = buildWall(); r.add(this.wall);
     // anillos de la colina
     this.hill = new THREE.Group(); this.hill.position.set(LH[0], 0, LH[2]); r.add(this.hill);
     this.rings = buildHillRings(); this.rings.forEach((m) => { m.position.y = m.userData.baseY; this.hill.add(m); });
-    this.castle = buildLastHearthCastle(); this.castle.position.y = 7 * 0.42; this.hill.add(this.castle);
+    this.castle = buildLastHearthCastle(); this.castle.scale.setScalar(1.5); this.castle.position.y = 7 * 0.42; this.hill.add(this.castle);
     // segunda loma escalonada junto al camino
     this.mound = buildRidge(); this.mound.position.set(18, 0, 10); r.add(this.mound);
     // rotulos
-    this.lblLH = label('Last Hearth', 1.3); this.lblLH.position.set(-3.5, 0.0, -5.5); this.lblLH.rotation.y = 0.35; r.add(this.lblLH);
+    this.lblLH = label('Last Hearth', 1.3); this.lblLH.position.set(-4.5, 0.0, -8.5); this.lblLH.rotation.y = 0.35; r.add(this.lblLH);
     this.lblWF = label('Winterfell', 1.3); this.lblWF.position.set(WF[0] + 3, 0.0, WF[2] + 8.5); this.lblWF.rotation.y = -0.25; r.add(this.lblWF);
     // Invernalia
     this.wf = buildWinterfell(); r.add(this.wf);
@@ -283,6 +283,8 @@ export class North {
     this.trunk.receiveShadow = false; this.leaves.receiveShadow = false;
     this.clip = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
     this.trunk.material = mat('barkclip', { roughness: 0.8 }); this.trunk.material.clippingPlanes = [this.clip];
+    this.leafClip = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
+    this.leaves.material = mat('leafclip', { roughness: 0.75 }); this.leaves.material.clippingPlanes = [this.leafClip];
     // bosques
     const pts = [];
     const R = rng(5);
@@ -305,7 +307,7 @@ export class North {
     for (let i = 0; i < 5000; i++) { const x = -6 + R() * 12, z = -8 + R() * 32; if (free(x, z)) pts.push([x, 0, z, R() * 6, 0.8 + R() * 0.4]); }
     // pinos sobre la loma
     for (let i = 0; i < 260; i++) { pts.push([18 + (R() - 0.5) * 2.5, 5 * 3 * 0.125, 10 + (R() - 0.5) * 22, R() * 6, 1]); }
-    this.pines = instanced(pineGeometry(), 0.07, [3.5, 0, 3.5], 'pine', pts); r.add(this.pines);
+    this.pines = instanced(pineBoxes(), 0, null, 'pine', pts); r.add(this.pines);
     // nubes para el cenital
     const ct = cloudTexture(3);
     this.clouds = new THREE.Group(); r.add(this.clouds);
@@ -328,7 +330,7 @@ export class North {
     const sc = st.shadow || [0, 0, -20, 40];
     const s = this.moon.shadow.camera; s.left = -sc[3]; s.right = sc[3]; s.top = sc[3]; s.bottom = -sc[3]; s.near = 1; s.far = 400; s.updateProjectionMatrix();
     this.moon.target.position.set(sc[0], sc[1], sc[2]);
-    this.moon.position.set(sc[0] + 55, sc[1] + 90, sc[2] + 50);
+    const md = st.moonDir || [55, 90, 50]; this.moon.position.set(sc[0] + md[0], sc[1] + md[1], sc[2] + md[2]);
     this.moon.intensity = st.moon ?? 1.4; this.hemi.intensity = st.hemi ?? 0.55;
     // escarcha
     const U = this.ground.material.userData.U;
@@ -348,8 +350,7 @@ export class North {
     this.trunk.scale.setScalar(ts);
     const lf = st.leaves ?? 1;
     this.leaves.visible = lf > 0.01;
-    this.leaves.scale.set(ts, ts * (0.3 + 0.7 * lf), ts);
-    this.leaves.scale.multiplyScalar(0.4 + 0.6 * lf);
+    this.leaves.scale.setScalar(ts); this.leafClip.constant = this.gods.position.y + (0.5 + lf * 4.8) * ts;
     this.clouds.visible = !!st.clouds;
     this.lblLH.visible = st.lblLH !== false; this.lblWF.visible = st.lblWF !== false;
     this.interiors.update(lt, cam, st, t);

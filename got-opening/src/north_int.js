@@ -88,7 +88,7 @@ function buildHall() {
   }
   // relieve de lobo sobre la chimenea (cuadrado tallado)
   g.box(NX - 10, 38, cz - 8, NX - 10, 52, cz + 8, (x, y, z) => ((y + z) % 5 === 0 ? 0x8a7a6a : 0x5a4e44));
-  const m = vox(g, v, [0, 0, cz], 'hall', { roughness: 0.85, emiGain: 1.1, emiTint: 0xffb060 });
+  const m = vox(g, v, [0, 0, cz], 'hall', { roughness: 0.85, emiGain: 0.7, emiTint: 0xffb060 });
   return m;
 }
 
@@ -157,25 +157,27 @@ export class NorthInteriors {
     r.add(im);
     // velas: cuerpo + llama emisiva
     const cg = new Grid(3, 8, 3); cg.box(1, 0, 1, 1, 4, 1, 0xe8e0c8); cg.box(1, 5, 1, 1, 7, 1, 0xffc070); for (let y = 5; y < 8; y++) cg.setE(1, y, 1, 255);
-    const cTmp = vox(cg, 0.04, [1.5, 0, 1.5], 'candle', { emiGain: 6, emiTint: 0xffb050 });
+    const cTmp = vox(cg, 0.06, [1.5, 0, 1.5], 'candle', { emiGain: 6, emiTint: 0xffb050 });
     const ci = new THREE.InstancedMesh(cTmp.geometry, cTmp.material, cand.length * 3);
     let k = 0;
     cand.forEach((p) => { for (let j = 0; j < 3; j++) { M.makeTranslation(p[0] + j * 0.12 - 0.12, p[1] + (j === 1 ? 0.05 : 0), p[2]); ci.setMatrixAt(k++, M); } });
     r.add(ci);
     this.candles = cand;
-    this.cl = [0, 1, 2, 3, 4, 5].map(() => { const l = new THREE.PointLight(0xffa850, 4, 4, 1.8); r.add(l); return l; });
+    this.cl = [0, 1, 2, 3, 4, 5].map(() => { const l = new THREE.PointLight(0xffa850, 4, 5, 1.5); r.add(l); return l; });
     // luz del salon
     this.hallFire = new THREE.PointLight(0xff9a40, 18, 22, 1.4); this.hallFire.position.set(31, 2, -5); r.add(this.hallFire);
     this.hallWin = new THREE.SpotLight(0xbcc8dc, 60, 30, 0.5, 0.6, 1.2); this.hallWin.position.set(12.5, 5, -12); this.hallWin.target.position.set(15, 0, -4); r.add(this.hallWin); r.add(this.hallWin.target);
     this.amb = new THREE.HemisphereLight(0x6a6a78, 0x1a1410, 0.5); r.add(this.amb);
-    this.passLight = new THREE.DirectionalLight(0xaab4c8, 1.2); this.passLight.position.set(-15, 20, 6); r.add(this.passLight);
+    this.hallCool = new THREE.PointLight(0xb8c4d8, 40, 18, 1.4); this.hallCool.position.set(12.5, 4.5, -9.5); r.add(this.hallCool);
+    this.hallGear = new THREE.PointLight(0xffc890, 25, 14, 1.4); this.hallGear.position.set(20, 4.2, -5); r.add(this.hallGear);
+    this.passLight = new THREE.DirectionalLight(0xaab4c8, 1.2); this.passLight.position.set(-15, 20, 6); r.add(this.passLight); r.add(this.passLight.target);
     // arciano visto por el tunel (copia)
     this.treeSpot = new THREE.Group(); this.treeSpot.position.set(0, 0, 16); r.add(this.treeSpot);
   }
   attachTree(trunkGeo, trunkMat, leafGeo, leafMat) {
     const a = new THREE.Mesh(trunkGeo, mat('bark')), b = new THREE.Mesh(leafGeo, leafMat);
     a.scale.setScalar(0.7); b.scale.setScalar(0.7);
-    const l = new THREE.PointLight(0xc8d4ff, 7, 10, 1.5); l.position.set(1.5, 3, -2); this.treeSpot.add(l);
+    const l = new THREE.PointLight(0xc8d4ff, 3, 10, 1.5); l.position.set(1.5, 3, -2); this.treeSpot.add(l);
     this.treeSpot.add(a); this.treeSpot.add(b);
   }
   update(lt, cam, st) {
@@ -183,6 +185,7 @@ export class NorthInteriors {
     this.passLight.intensity = st.pass ?? 1.2;
     this.hallFire.intensity = st.fire ?? 8;
     this.hallWin.intensity = st.win ?? 60;
+    this.hallCool.intensity = st.win ? 40 : 0; this.hallGear.intensity = st.win ? 25 : 0;
     this.gears.forEach((g) => (g.rotation.y = lt * g.userData.sp));
     // luces de vela mas cercanas por delante de la camara
     const cx = cam.position.x - this.root.position.x;

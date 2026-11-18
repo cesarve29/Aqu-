@@ -20,21 +20,21 @@ export const SHOTS = [
   {
     t0: 0, t1: 2.336, f: (lt) => astroBase({
       cam: heroCam(lt, {
-        pos: [[0, [0.25, -0.35, 4.25]], [1.4, [0.05, -0.3, 4.2]], [2.336, [-0.15, 0.1, 4.45]]],
+        pos: [[0, [0.22, -0.3, 4.02]], [1.4, [0.05, -0.27, 4.0]], [2.336, [-0.15, 0.1, 4.4]]],
         look: [[0, [0.2, 0.0, 3.0]], [1.4, [0.0, 0.0, 3.0]], [2.336, [-0.1, 0.25, 3.0]]], fov: 32,
       }),
-      focus: 1.27, aperture: 0.004, maxblur: 0.01,
+      focus: 1.03, aperture: 0.004, maxblur: 0.01,
       sky: { ...ASTRO_SKY, glowDir: [0, -0.1, -1] },
       state: { hero: 'dragons', heroRot: 0.42, heroPos: [0.0, 0.0, 3.0], rings: false, bands: false, burst: 0.8, cross: kf(lt, [[1.3, 2.5], [2.336, 0.2]]) },
     }),
   },
   {
-    t0: 2.336, t1: 4.3, f: (lt) => {
+    t0: 2.336, t1: 4.8, f: (lt) => {
       const pos = spline(lt, [[0, [0.5, -1.6, 8.2]], [1.2, [0.35, -1.3, 7.0]], [1.96, [-0.6, -0.6, 4.4]]]);
       return astroBase({
         cam: { pos, look: kf(lt, [[0, [0.3, 0.3, 0]], [1.96, [0.9, 0.2, 0]]]), fov: 40, roll: kf(lt, [[0, rad(-6)], [1.96, rad(8)]]) },
         aperture: 0.0008, sky: { ...ASTRO_SKY, glowDir: glowTo(pos) },
-        fade: kf(lt, [[0, 1], [1.5, 1], [1.96, 0.35]]),
+        fade: kf(lt, [[0, 1], [1.5, 1], [2.46, 0.3]]),
         state: { rings: true, bands: true, burst: 0.6, bandSlope: kf(lt, [[0, rad(-14)], [1.96, rad(-24)]]) },
       });
     },
@@ -44,7 +44,7 @@ export const SHOTS = [
   {
     t0: 53.4, t1: 56.348, f: (lt) => astroBase({
       cam: heroCam(lt, {
-        pos: [[0, [0.1, -0.6, 4.3]], [0.6, [0.08, -0.2, 4.25]], [2.95, [-0.06, -0.18, 4.25]]],
+        pos: [[0, [0.1, -0.6, 4.1]], [0.6, [0.08, -0.18, 4.05]], [2.95, [-0.06, -0.16, 4.05]]],
         look: [[0, [0.1, 0.1, 3.0]], [0.6, [0.08, 0.02, 3.0]], [2.95, [-0.06, 0.02, 3.0]]], fov: 33,
       }),
       focus: 1.27, aperture: 0.0035, maxblur: 0.01,
@@ -80,7 +80,7 @@ export const SHOTS = [
   {
     t0: 95.4, t1: 100.767, f: (lt) => astroBase({
       cam: { pos: kf(lt, [[0, [0.0, -0.3, 6.6]], [1.4, [0.0, -0.15, 6.2]], [5.4, [0.0, -0.1, 5.75]]]), look: [0, 0.02, 2.2], fov: 40 },
-      aperture: 0.0008, bloom: 0.35, bloomTh: 0.9,
+      aperture: 0.0008, bloom: 0.18, bloomTh: 0.93,
       sky: { ...ASTRO_SKY, glowDir: [0, 0, -1] },
       state: { logo: true, logoRot: kf(lt, [[0, -0.55], [1.5, 0]]), logoTilt: kf(lt, [[0, 0.5], [1.5, 0]]), rings: false, bands: false, burst: 1.0 },
     }),

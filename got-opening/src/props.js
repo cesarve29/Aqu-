@@ -1,5 +1,6 @@
 // Piezas reutilizables: suelo de mapa por shader, pinos instanciados, rotulos, engranajes, nubes.
 import { THREE, Grid, vox, mat, bitmap, hash3, clamp, lerp, rng, jitter, shade, mix } from './kit.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // ---------------------------------------------------------------------------
 // suelo del mapa: losas, costa/mar, rios, escarcha azul que avanza
@@ -83,16 +84,46 @@ export function pineGeometry(snow = true, dark = 0x2f3b33) {
   }
   return g;
 }
+// pino de pocas cajas (escalonado, aspecto voxel) para bosques masivos
+export function pineBoxes(snow = true, dark = 0x44564a) {
+  const parts = [];
+  const add = (w, h, d, x, y, z, col) => {
+    const b = new THREE.BoxGeometry(w, h, d); b.translate(x, y + h / 2, z);
+    const c = new THREE.Color(col); const n = b.attributes.position.count;
+    const ca = new Float32Array(n * 3), ea = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const k = 0.8 + 0.2 * (b.attributes.normal.getY(i) > 0.5 ? 1 : (b.attributes.normal.getY(i) < -0.5 ? 0 : 0.6)); ca[i * 3] = c.r * k; ca[i * 3 + 1] = c.g * k; ca[i * 3 + 2] = c.b * k; }
+    b.setAttribute('color', new THREE.BufferAttribute(ca, 3)); b.setAttribute('emi', new THREE.BufferAttribute(ea, 1));
+    parts.push(b.toNonIndexed());
+  };
+  const s = 0.07;
+  add(1 * s, 3 * s, 1 * s, 0, 0, 0, 0x3a2c22);
+  const tiers = [[7, 3, 2], [5, 3, 5], [3, 3, 8], [1, 3, 11]];
+  for (const [w, h, y] of tiers) {
+    add(w * s, h * s, w * s, 0, y * s, 0, dark);
+    if (snow) add((w - 0.6) * s, 0.5 * s, (w - 0.6) * s, 0, (y + h) * s, 0, 0xe2e6ea);
+  }
+  const g = mergeGeometries(parts);
+  return g;
+}
 export function instanced(grid, v, origin, matKey, pts, opts = {}) {
-  const tmp = vox(grid, v, origin, matKey, opts.mat || {});
-  const im = new THREE.InstancedMesh(tmp.geometry, tmp.material, pts.length);
+  const tmp = grid.isBufferGeometry ? { geometry: grid, material: mat(matKey, opts.mat || {}) } : vox(grid, v, origin, matKey, opts.mat || {});
+  // agrupado espacial para que el recorte por frustum funcione
+  const cell = opts.cell || 16;
+  const buckets = new Map();
+  for (const p of pts) { const k = Math.floor(p[0] / cell) + ',' + Math.floor(p[2] / cell); if (!buckets.has(k)) buckets.set(k, []); buckets.get(k).push(p); }
+  const grp = new THREE.Group();
   const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), E = new THREE.Euler();
-  pts.forEach((p, i) => {
-    E.set(0, p[3] || 0, 0); Q.setFromEuler(E); const s = p[4] || 1; S.set(s, s * (p[5] || 1), s); P.set(p[0], p[1], p[2]);
-    M.compose(P, Q, S); im.setMatrixAt(i, M);
-  });
-  im.castShadow = opts.cast ?? true; im.receiveShadow = true;
-  return im;
+  for (const list of buckets.values()) {
+    const im = new THREE.InstancedMesh(tmp.geometry, tmp.material, list.length);
+    list.forEach((p, i) => {
+      E.set(0, p[3] || 0, 0); Q.setFromEuler(E); const s = p[4] || 1; S.set(s, s * (p[5] || 1), s); P.set(p[0], p[1], p[2]);
+      M.compose(P, Q, S); im.setMatrixAt(i, M);
+    });
+    im.computeBoundingSphere();
+    im.castShadow = opts.cast ?? false; im.receiveShadow = true;
+    grp.add(im);
+  }
+  return grp;
 }
 
 // ---------------------------------------------------------------------------
@@ -107,9 +138,9 @@ export function label(text, heightU, v = 0.05, font = 'Uncial') {
   const nx = Math.ceil(bm.w * k), nz = Math.ceil(bm.h * k);
   const g = new Grid(nx, 3, nz);
   for (let x = 0; x < nx; x++) for (let z = 0; z < nz; z++) {
-    if (bm.at(x / k, z / k) > 0.5) for (let y = 0; y < 2; y++) g.set(x, y, z, jitter(0xc8962e, 0.25, x, y, z));
+    if (bm.at(x / k, z / k) > 0.5) for (let y = 0; y < 2; y++) { g.set(x, y, z, jitter(0xd0a040, 0.25, x, y, z)); g.setE(x, y, z, 35); }
   }
-  return vox(g, v, [nx / 2, 0, nz / 2], 'gold', { roughness: 0.35, metalness: 0.85 });
+  return vox(g, v, [nx / 2, 0, nz / 2], 'goldL', { roughness: 0.45, metalness: 0.35, emiGain: 1.0 });
 }
 
 // ---------------------------------------------------------------------------

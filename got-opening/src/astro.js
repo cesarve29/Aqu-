@@ -176,7 +176,7 @@ function logoMesh() {
     const a = text.at(x * 2 + 1, ty);
     if (a > 0.5) for (let z = 8; z <= 9; z++) { g.set(x, y, z, 0xfff1d6); g.setE(x, y, z, 255); }
   }
-  const m = vox(g, v, [cx, cy, 0], 'logo', { roughness: 0.5, metalness: 0.6, emiGain: 1.8, emiTint: 0xffe8c0 });
+  const m = vox(g, v, [cx, cy, 0], 'logo', { roughness: 0.75, metalness: 0.3, emiGain: 1.0, emiTint: 0xffe8c0 });
   return m;
 }
 
