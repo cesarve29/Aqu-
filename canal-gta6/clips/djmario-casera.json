@@ -1,34 +1,215 @@
 {
-  "salida": "djmario-casera.mp4",
-  "titulo": "El momento de DJ Mario<br>que se hizo viral<br><span class=\"a\">a horas de salir GTA 6</span>",
-  "credito": "Vídeo original: DjMaRiiO (directo en Kick)",
-  "recorte": "960:720:0:0",
-  "partes": [[1.5, 16.0], [42.0, 64.0], [96.0, 139.8]],
-  "subtitulos": [
-    [1.8, 4.6, "Gente, por favor, niños, idos", "amarillo"],
-    [4.6, 7.2, "que sé cómo acaba esto", "amarillo"],
-    [9.6, 11.6, "Tengo miedo de acabar esto", "amarillo"],
-    [12.5, 16.0, "Hay casi 300.000 personas mirando", "amarillo"],
-    [42.0, 44.2, "Ahora estoy escondiendo mi cara, gente", "amarillo"],
-    [44.3, 46.4, "Creo que a eso se le llama acoso, Mandy"],
-    [46.6, 50.6, "Qué va, si os habéis conocido en persona, no es acoso"],
-    [52.6, 57.6, "Solo dime si debo seguir rompiendo electrodomésticos para que vengas a verme"],
-    [60.0, 63.8, "Lo que sea. Es una broma, tonto"],
-    [96.4, 98.6, "Bueno, pues esto ya está"],
-    [98.8, 100.6, "Ahora ya funciona"],
-    [100.7, 105.6, "Quédatelos por arreglarme el fregadero"],
-    [106.4, 108.2, "Ah, pues muchas gracias, Mandy"],
-    [108.9, 112.8, "¿Qué pasa, Jason? ¿Por qué no te gusto?"],
-    [113.3, 114.8, "¿Con quién estás?"],
-    [114.9, 116.2, "Con nadie"],
-    [116.3, 117.8, "Mentira"],
-    [118.2, 119.4, "Que no"],
-    [119.5, 123.4, "Sí que lo es. Hablé con la camarera del Rusty Anchor"],
-    [123.5, 128.4, "y me dijo que tienes una ex en la cárcel"],
-    [128.5, 129.4, "Vas a volver con ella, ¿verdad?"],
-    [129.5, 130.4, "Me vuelvo al trabajo"],
-    [130.5, 134.4, "¡Se suponía que nos íbamos a casar!"],
-    [134.5, 136.3, "Si apenas nos conocemos"],
-    [136.4, 139.8, "Déjame sola, Jason. ¡Lo has jodido todo!"]
+ "salida": "djmario-casera.mp4",
+ "titulo": "El momento de DJ Mario<br>que se hizo viral<br><span class=\"a\">a horas de salir GTA 6</span>",
+ "credito": "Vídeo original: DjMaRiiO (directo en Kick)",
+ "recorte": "960:720:0:0",
+ "partes": [
+  [
+   0.3,
+   145.9
   ]
+ ],
+ "subtitulos": [
+  [
+   1.8,
+   4.6,
+   "Gente, por favor, niños, idos",
+   "amarillo"
+  ],
+  [
+   4.6,
+   7.2,
+   "que sé cómo acaba esto",
+   "amarillo"
+  ],
+  [
+   9.6,
+   11.6,
+   "Tengo miedo de acabar esto",
+   "amarillo"
+  ],
+  [
+   12.5,
+   15.3,
+   "Hay casi 300.000 personas en este momento",
+   "amarillo"
+  ],
+  [
+   15.4,
+   18.6,
+   "y el momento más top del directo es esto",
+   "amarillo"
+  ],
+  [
+   23.0,
+   26.0,
+   "Snapmatic"
+  ],
+  [
+   26.1,
+   27.0,
+   "Otra vez no..."
+  ],
+  [
+   27.1,
+   30.9,
+   "Puedes conocer a una persona del tirón"
+  ],
+  [
+   31.0,
+   34.9,
+   "Descubrir todo lo que quieres saber,"
+  ],
+  [
+   35.0,
+   39.9,
+   "como qué música escucha o con quién ha salido,"
+  ],
+  [
+   40.0,
+   42.7,
+   "o a qué gimnasio va, mmm..."
+  ],
+  [
+   42.8,
+   44.1,
+   "Ahora estoy escondiendo mi cara, gente",
+   "amarillo"
+  ],
+  [
+   44.2,
+   46.4,
+   "Creo que a eso se le llama acoso, Mandy"
+  ],
+  [
+   46.6,
+   50.6,
+   "Qué va, si os habéis conocido en persona, no es acoso"
+  ],
+  [
+   52.6,
+   57.6,
+   "Solo dime si debo seguir rompiendo electrodomésticos para que vengas a verme"
+  ],
+  [
+   60.0,
+   63.8,
+   "Lo que sea. Es una broma, tonto"
+  ],
+  [
+   68.0,
+   69.9,
+   "Ya casi está..."
+  ],
+  [
+   79.0,
+   80.9,
+   "Uf"
+  ],
+  [
+   82.9,
+   85.4,
+   "¡Ups! Me había olvidado"
+  ],
+  [
+   85.9,
+   89.8,
+   "Pues... Ya he enviado el alquiler..."
+  ],
+  [
+   90.0,
+   93.9,
+   "Ya. Eh... Gracias"
+  ],
+  [
+   96.4,
+   98.6,
+   "Bueno, pues esto ya está"
+  ],
+  [
+   98.8,
+   100.6,
+   "Ahora ya funciona"
+  ],
+  [
+   100.7,
+   105.6,
+   "Quédatelos por arreglarme el fregadero"
+  ],
+  [
+   106.4,
+   108.2,
+   "Ah, pues muchas gracias, Mandy"
+  ],
+  [
+   108.9,
+   112.8,
+   "¿Qué pasa, Jason? ¿Por qué no te gusto?"
+  ],
+  [
+   113.3,
+   114.8,
+   "¿Con quién estás?"
+  ],
+  [
+   114.9,
+   116.2,
+   "Con nadie"
+  ],
+  [
+   116.3,
+   117.8,
+   "Mentira"
+  ],
+  [
+   118.2,
+   119.4,
+   "Que no"
+  ],
+  [
+   119.5,
+   123.4,
+   "Sí que lo es. Hablé con la camarera del Rusty Anchor"
+  ],
+  [
+   123.5,
+   128.4,
+   "y me dijo que tienes una ex en la cárcel"
+  ],
+  [
+   128.5,
+   129.4,
+   "Vas a volver con ella, ¿verdad?"
+  ],
+  [
+   129.5,
+   130.4,
+   "Me vuelvo al trabajo"
+  ],
+  [
+   130.5,
+   134.4,
+   "¡Se suponía que nos íbamos a casar!"
+  ],
+  [
+   134.5,
+   136.3,
+   "Si apenas nos conocemos"
+  ],
+  [
+   136.4,
+   139.8,
+   "Déjame sola, Jason. ¡Lo has jodido todo!"
+  ],
+  [
+   140.0,
+   142.6,
+   "¡Me cago en mi puta vida!"
+  ],
+  [
+   142.7,
+   145.8,
+   "¿Por qué cojones no aparcan en su lado?"
+  ]
+ ]
 }

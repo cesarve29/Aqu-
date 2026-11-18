@@ -1,7 +1,7 @@
 # DJ Mario y la casera de Jason — publicación
 
-Archivo: `final/djmario-casera.mp4` (1440×2560, 1:21 con cierre).
-Tramos del directo original: 0:01–0:16, 0:42–1:04, 1:36–2:20.
+Archivo: `final/djmario-casera.mp4` (1440×2560, 2:28 con cierre).
+Directo casi completo (0:00–2:26), sin la pantalla final de Kick.
 
 **Título:** DJ Mario no estaba preparado para esta escena de GTA 6 😂 #GTA6 #Shorts
 
@@ -11,7 +11,7 @@ A pocas horas de la salida de GTA 6, DJ Mario se cruzó en directo con la casera
 
 ¿Tú qué habrías hecho? 👇
 
-🎥 Vídeo original: DjMaRiiO – directo en Kick. Todos los derechos pertenecen a su creador. Edición y subtítulos: @SeisEnVice.
+🎥 Vídeo original: DjMaRiiO – directo en Kick. Todos los derechos pertenecen a su creador. Clip de ItzCarloszzz. Edición y subtítulos: @SeisEnVice.
 
 🔔 Suscríbete a @SeisEnVice para más clips de GTA 6.
 
