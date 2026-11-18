@@ -3,7 +3,8 @@
 // config: {
 //   salida, titulo: "texto (admite <br>)", credito: "🎥 Vídeo original: IGN",
 //   partes: [[ini, fin], ...]          // tramos del vídeo original (s); se unen con un fundido suave
-//   subtitulos: [[ini, fin, "texto"]]  // tiempos del vídeo ORIGINAL; se recolocan solos
+//   subtitulos: [[ini, fin, "texto", "amarillo"?]]  // tiempos del vídeo ORIGINAL; 4º campo opcional: color
+//   recorte: "w:h:x:y"                  // opcional, zona del original que se muestra (por defecto 1440:1080:240:0, centro de 1080p)
 // }
 // Formato 1440x2560: título arriba, vídeo 1440x1080 a resolución nativa (centro del 16:9),
 // subtítulos grandes debajo, crédito, y cierre del canal al final (reglas 1, 2, 4, 9).
@@ -43,6 +44,7 @@ async function overlay(file) {
   await b.close();
 }
 
+const COLOR = { amarillo: '\\c&H66E0FF&', rosa: '\\c&HB43FFF&', cian: '\\c&HFFF25E&' }; // BGR
 const ts = (x) => { const h = Math.floor(x / 3600), m = Math.floor(x / 60) % 60, s = (x % 60).toFixed(2).padStart(5, '0'); return `${h}:${String(m).padStart(2, '0')}:${s}`; };
 function ass(file, subs) {
   // subtítulos debajo del vídeo: Montserrat Black, blanco con borde negro, máx. 2 líneas
@@ -50,7 +52,7 @@ function ass(file, subs) {
     `Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n` +
     `Style: Sub,Montserrat Black,140,&H00FFFFFF,&H00FFFFFF,&H00260612,&H64000000,0,0,0,0,100,100,0,0,1,11,5,8,50,50,${VY + VH + 40},1\n\n` +
     `[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
-  fs.writeFileSync(file, head + subs.map(([a, b, t]) => `Dialogue: 0,${ts(a)},${ts(b)},Sub,,0,0,0,,{\\fad(60,60)}${t.replace(/\n/g, '\\N')}`).join('\n') + '\n');
+  fs.writeFileSync(file, head + subs.map(([a, b, t, c]) => `Dialogue: 0,${ts(a)},${ts(b)},Sub,,0,0,0,,{\\fad(60,60)${COLOR[c] || ''}}${t.replace(/\n/g, '\\N')}`).join('\n') + '\n');
 }
 
 (async () => {
@@ -62,7 +64,7 @@ function ass(file, subs) {
     const out = path.join(tmp, `p${i}.mp4`);
     ff(['-ss', String(a), '-t', String(b - a), '-i', SRC, '-filter_complex',
       `[0:v]fps=30,split[x][y];[x]scale=360:640:force_original_aspect_ratio=increase,crop=360:640,boxblur=10:2,scale=${W}:${H},eq=brightness=-0.2:saturation=1.2[bg];` +
-      `[y]crop=1440:1080:240:0,eq=saturation=1.08[v];[bg][v]overlay=0:${VY},setsar=1,format=yuv420p[o];` +
+      `[y]crop=${cfg.recorte || '1440:1080:240:0'},scale=1440:1080:flags=lanczos,eq=saturation=1.08[v];[bg][v]overlay=0:${VY},setsar=1,format=yuv420p[o];` +
       `[0:a]aresample=48000,aformat=channel_layouts=stereo[ao]`,
       '-map', '[o]', '-map', '[ao]', '-c:v', 'libx264', '-crf', '15', '-preset', 'fast', '-c:a', 'pcm_s16le', out]);
     return out;
@@ -73,19 +75,19 @@ function ass(file, subs) {
   const DUR = acc;
   // frases largas -> se dividen en dos subtítulos seguidos (máx. ~2 líneas en pantalla)
   const MAX = 40, cortos = [];
-  const partir = (s, e, t) => {
-    if (t.length <= MAX) { cortos.push([s, e, t]); return; }
+  const partir = (s, e, t, c) => {
+    if (t.length <= MAX) { cortos.push([s, e, t, c]); return; }
     const mid = t.length / 2; let k = -1;
     for (let i = 0; i < t.length; i++) if (t[i] === ' ' && (k < 0 || Math.abs(i - mid) < Math.abs(k - mid))) k = i;
     const m = s + (e - s) * (k / t.length);
-    partir(s, m, t.slice(0, k)); partir(m, e, t.slice(k + 1));
+    partir(s, m, t.slice(0, k), c); partir(m, e, t.slice(k + 1), c);
   };
-  for (const [s, e, t] of cfg.subtitulos) partir(s, e, t);
+  for (const [s, e, t, c] of cfg.subtitulos) partir(s, e, t, c);
   const subs = [];
-  for (const [s, e, t] of cortos) {
+  for (const [s, e, t, c] of cortos) {
     cfg.partes.forEach(([a, b], i) => {
       const s2 = Math.max(s, a), e2 = Math.min(e, b);
-      if (e2 - s2 > 0.15) subs.push([s2 - a + offs[i], e2 - a + offs[i], t]);
+      if (e2 - s2 > 0.15) subs.push([s2 - a + offs[i], e2 - a + offs[i], t, c]);
     });
   }
   const assFile = path.join(tmp, 'subs.ass');
