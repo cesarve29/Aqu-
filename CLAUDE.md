@@ -13,7 +13,8 @@ Guía completa (títulos, descripciones, etiquetas, derechos): `canal-gta6/GUIA-
    (2 s, "SUSCRÍBETE @SeisEnVice") al final de cada Short.
 3. La intro completa (`intro-logo-16x9.mp4` / `montar-intro.sh` con cortes del tráiler) es solo
    para vídeos largos o recopilaciones.
-4. Formato Shorts: 1080×1920, 30 fps, menos de 60 s en total (incluido el cierre),
+4. Formato Shorts: 1440×2560 (o 1080×1920), 30 fps, máximo 3 min (límite de YouTube Shorts). Clips de
+   vídeos largos/gameplay: entre 1:00 y 1:20 cada uno, sin cortes bruscos;
    subtítulos grandes grabados en el vídeo, colores de marca (rosa neón #ff3fb4, cian #5ef2ff,
    amarillo #ffe066, fondo morado #120626).
 5. Para cada Short entregar también: título, descripción y etiquetas según `GUIA-CANAL.md`.
