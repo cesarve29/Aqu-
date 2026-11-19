@@ -32,13 +32,13 @@ def sky(ctx, t, green=0.0, moon=(1520, 210), moon_mood='sleepy', stars=True, moo
     g = cairo.LinearGradient(0, 0, 0, horizon)
     g.add_color_stop_rgb(0, *top)
     g.add_color_stop_rgb(1, *bot)
-    ctx.rectangle(-200, -200, W + 400, H + 400)
+    ctx.rectangle(-900, -900, W + 1800, H + 1800)
     ctx.set_source(g)
     ctx.fill()
     if stars:
-        for i in range(150):
-            x = u01(i, 1.1) * W
-            y = u01(i, 2.2) ** 1.4 * horizon * 0.8
+        for i in range(190):
+            x = u01(i, 1.1) * (W + 700) - 350
+            y = u01(i, 2.2) ** 1.4 * horizon * 0.85 - 150
             tw = 0.55 + 0.45 * math.sin(t * (1.5 + u01(i, 3.3) * 3) + i)
             r = 2 + u01(i, 4.4) * 7
             sparkle(ctx, x, y, r * (0.7 + 0.3 * tw), mixc(CREAM, LIME, green * 0.6), 0.55 + 0.45 * tw,
