@@ -425,6 +425,8 @@ def sparkle(ctx, x, y, r, c=CREAM, a=1.0, rot=0.0):
 
 def text(ctx, s, x, y, size, font, fill, outline=INK, lw=8.0, shadow=None, sdx=6, sdy=6,
          align=0.5, rot=0.0, scale=1.0, a=1.0):
+    if abs(scale) < 0.01:
+        return
     ctx.save()
     ctx.translate(x, y)
     ctx.rotate(rot)
@@ -593,7 +595,7 @@ def candy_cane(ctx, x, y, ang, L=150, w=16, lw=5):
 
 
 def jengi(ctx, x, y, s=1.0, face=1, pose='idle', t=0.0, expr='happy', phase=0.0, cane=False,
-          pose_override=None, alpha=1.0):
+          pose_override=None, alpha=1.0, talk=0.0):
     p = hero_pose(pose, t, phase)
     if pose_override:
         p.update(pose_override)
@@ -676,12 +678,17 @@ def jengi(ctx, x, y, s=1.0, face=1, pose='idle', t=0.0, expr='happy', phase=0.0,
         eye(ctx, hx + 38, hy - 10, 13, 20, lx, ly, bl, lw)
         line(ctx, [(hx - 16, hy - 40), (hx + 16, hy - 30)], 6)
         line(ctx, [(hx + 26, hy - 30), (hx + 52, hy - 38)], 6)
-        mouth(ctx, hx + 22, hy + 22, 40, 0.35 if expr == 'angry' else 0.15, -0.3 if expr == 'angry' else 0.6,
+        mo = 0.35 if expr == 'angry' else 0.15
+        if talk > 0:
+            mo = 0.15 + 0.6 * talk * abs(math.sin(twos(t) * 15))
+        mouth(ctx, hx + 22, hy + 22, 40 if talk <= 0 else 48, mo, -0.3 if expr == 'angry' else 0.6,
               lw, teeth=True, tongue=False)
     else:
         eye(ctx, hx + 2, hy - 12, 15, 22, lx, ly, bl, lw)
         eye(ctx, hx + 38, hy - 12, 13, 21, lx, ly, bl, lw)
         op = 0.75 if expr == 'happy' else 0.4
+        if talk > 0:
+            op = 0.15 + 0.7 * talk * abs(math.sin(twos(t) * 15))
         mouth(ctx, hx + 20, hy + 18, 62, op, 1.0, lw, teeth=True)
     circle(ctx, hx - 22, hy + 14, 9, BLUSH, 0, 0.75)
     circle(ctx, hx + 56, hy + 12, 8, BLUSH, 0, 0.75)
@@ -694,7 +701,7 @@ def jengi(ctx, x, y, s=1.0, face=1, pose='idle', t=0.0, expr='happy', phase=0.0,
     # brazo delantero
     ang = hose(ctx, shR, p['rh'], 18, 15, GINGER, lw)
     if cane:
-        candy_cane(ctx, p['rh'][0], p['rh'][1], p.get('cane_ang', -1.75), 150, 14, 4.5)
+        candy_cane(ctx, p['rh'][0], p['rh'][1], p.get('cane_ang', -1.2), 150, 14, 4.5)
     glove(ctx, p['rh'][0], p['rh'][1], ang, 26, lw, fist=cane)
     ctx.restore()
 
@@ -744,7 +751,7 @@ def scarf_tail(ctx, x, y, t, length=120, wind=1.0, lw=4.5, dirx=-1):
 
 
 def nieve(ctx, x, y, s=1.0, face=1, pose='idle', t=0.0, expr='happy', phase=0.0, sling=False,
-          pose_override=None):
+          pose_override=None, talk=0.0):
     p = hero_pose(pose, t, phase + 0.7)
     if pose_override:
         p.update(pose_override)
@@ -833,11 +840,15 @@ def nieve(ctx, x, y, s=1.0, face=1, pose='idle', t=0.0, expr='happy', phase=0.0,
         eye(ctx, hx + 30, hy + 2, 11, 16, lx, ly, bl, lw, lashes=True)
         line(ctx, [(hx - 16, hy - 20), (hx + 10, hy - 12)], 5)
         line(ctx, [(hx + 22, hy - 12), (hx + 42, hy - 18)], 5)
-        mouth(ctx, hx + 14, hy + 32, 26, 0.12, 0.5, lw - 1, tongue=False)
+        mouth(ctx, hx + 14, hy + 32, 26 if talk <= 0 else 32,
+              0.12 if talk <= 0 else 0.15 + 0.6 * talk * abs(math.sin(twos(t) * 14)), 0.5, lw - 1, tongue=False)
     else:
         eye(ctx, hx - 2, hy, 13, 18, lx, ly, bl, lw, lashes=True)
         eye(ctx, hx + 30, hy, 11, 17, lx, ly, bl, lw, lashes=True)
-        mouth(ctx, hx + 14, hy + 30, 34, 0.55 if expr == 'happy' else 0.2, 1.0, lw - 1)
+        op = 0.55 if expr == 'happy' else 0.2
+        if talk > 0:
+            op = 0.15 + 0.7 * talk * abs(math.sin(twos(t) * 14))
+        mouth(ctx, hx + 14, hy + 30, 34, op, 1.0, lw - 1)
     # nariz de zanahoria
     poly(ctx, [(hx + 10, hy + 8), (hx + 62, hy + 16), (hx + 10, hy + 22)], ORANGE, lw - 1, smooth=False,
          seed=33, wob=0.6)
@@ -972,7 +983,7 @@ PRESENT_COLORS = [(RED, GOLD), (GREEN, RED), ((0.25, 0.42, 0.75), WHITE), (GOLD,
 
 def krampus(ctx, x, y, s=1.0, face=1, t=0.0, grin=0.6, lh=None, rh=None, tongue=1.0,
             eyes_glow=0.0, basket=True, stomp=0.0, look=(0.0, 0.3), lean=0.0, mouth_open=None,
-            hop=0.0, expr='evil', bell_in_hand=None):
+            hop=0.0, expr='evil', bell_in_hand=None, santa_hat=False, bell_on_horn=None):
     tt = twos(t)
     lw = 7.0
     ctx.save()
@@ -1098,6 +1109,14 @@ def krampus(ctx, x, y, s=1.0, face=1, t=0.0, grin=0.6, lh=None, rh=None, tongue=
         line(ctx, tpts[2:8], 3, RED_D, 0.8)
     # barba de chivo
     poly(ctx, [(hx - 10, hy + 108), (hx + 40, hy + 108), (hx + 18, hy + 170)], FUR, lw, seed=60)
+    if santa_hat:
+        poly(ctx, [(hx - 80, hy - 70), (hx + 95, hy - 70), (hx + 60, hy - 170), (hx - 20, hy - 230),
+                   (hx - 90, hy - 200)], RED, lw, seed=61)
+        circle(ctx, hx - 110, hy - 190, 26, WHITE, lw)
+        blob(ctx, hx + 8, hy - 70, 100, 22, WHITE, lw, seed=62)
+    if bell_on_horn is not None:
+        line(ctx, [(hx + 190, hy - 120), (hx + 192, hy - 60)], 5, GOLD_D)
+        golden_bell(ctx, hx + 192, hy - 10, 0.55, bell_on_horn)
 
     # brazo delantero
     ang = hose(ctx, shR, rh, -60, 30, FUR, lw)

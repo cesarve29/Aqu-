@@ -97,14 +97,16 @@ def speed_lines(ctx, x, y, n, length, a=1.0, seed=0.0):
 
 
 def dust_puff(ctx, x, y, age, s=1.0, seed=0.0):
-    if age < 0 or age > 1.2:
+    """Nube de polvo/nieve en forma de cúpula que se expande y se desvanece."""
+    if age < 0 or age > 1.0:
         return
-    for k in range(6):
-        u = age / 1.2
-        r = (30 + 40 * u) * s * (0.7 + 0.5 * u01(k, seed))
-        dx = (k - 2.5) * 34 * s * (0.4 + u)
-        blob(ctx, x + dx, y - 40 * s - r * 0.5 - u * 90 * s * u01(k, seed + 2), r * 1.3, r, (0.95, 0.94, 0.98),
-             3, seed=seed + k, a=(1 - u) * 0.9)
+    u = age / 1.0
+    for k in range(7):
+        a = math.pi + (k + 0.5) / 7 * math.pi
+        d = (30 + 90 * ease_out(u)) * s
+        r = (26 + 22 * u01(k, seed)) * s * (1.0 - 0.45 * u)
+        blob(ctx, x + math.cos(a) * d * 1.3, y - 10 * s + math.sin(a) * d * 0.8, r, r * 0.9,
+             (0.96, 0.95, 0.99), 3, seed=seed + k, a=(1 - u) * 0.95)
 
 
 # ----------------------------------------------------------------------------
@@ -714,10 +716,18 @@ def stills(times, tl_name='preview'):
         print('still', tt)
 
 
+import escenas2  # noqa: E402
+
+TIMELINES['full'] = escenas2.build(sys.modules[__name__])
+
 if __name__ == '__main__':
     cmd = sys.argv[1] if len(sys.argv) > 1 else 'preview'
     if cmd == 'stills':
-        stills(sys.argv[2:])
+        args = sys.argv[2:]
+        tl = 'preview'
+        if args and args[0] in TIMELINES:
+            tl, args = args[0], args[1:]
+        stills(args, tl)
     elif cmd == 'preview':
         render('preview', 'previa_1080p')
     elif cmd == 'full':
