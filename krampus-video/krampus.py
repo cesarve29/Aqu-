@@ -630,15 +630,30 @@ def decode(name, sr=48000):
     return np.frombuffer(raw, np.float32).reshape(-1, 2).copy()
 
 
+def active_rms(x, gate=0.01):
+    m = np.abs(x).max(axis=1)
+    sel = x[m > gate]
+    if len(sel) < 100:
+        sel = x
+    return float(np.sqrt((sel ** 2).mean()) + 1e-9)
+
+
+# niveles objetivo (RMS de las partes activas)
+VOICE_RMS = 0.15
+MUSIC_RMS = 0.040    # para ganancia 0.5 en la lista de cues
+SFX_RMS = 0.075      # para ganancia 0.6
+
+
 def build_audio(cues, dur, path, sr=48000):
     n = int(dur * sr)
     music = np.zeros((n, 2), np.float32)
     voice = np.zeros((n, 2), np.float32)
     sfx = np.zeros((n, 2), np.float32)
-    # proyector de fondo (loop)
+    # proyector de fondo (loop), muy bajito
     proj = decode('sfx_projector', sr)
+    proj *= 0.02 / active_rms(proj)
     reps = n // len(proj) + 1
-    bed = np.tile(proj, (reps, 1))[:n] * 0.10
+    bed = np.tile(proj, (reps, 1))[:n]
     bed[:int(3.2 * sr)] *= 3.0
     cache = {}
     for name, start, gain, opt in cues:
@@ -647,32 +662,52 @@ def build_audio(cues, dur, path, sr=48000):
         clip = cache[name]
         off = int(opt.get('offset', 0) * sr)
         clip = clip[off:].copy()
+        # normalización por tipo de pista
+        r = active_rms(cache[name])
+        if opt.get('voice'):
+            clip *= VOICE_RMS * gain / r
+        elif opt.get('music'):
+            clip *= MUSIC_RMS * (gain / 0.5) / r
+        else:
+            clip *= SFX_RMS * (gain / 0.6) / r
         if 'fade_in' in opt:
-            k = int(opt['fade_in'] * sr)
-            clip[:k] *= np.linspace(0, 1, k)[:, None]
+            kf = int(opt['fade_in'] * sr)
+            clip[:kf] *= np.linspace(0, 1, kf)[:, None]
         i0 = int(start * sr)
         if i0 >= n:
             continue
-        seg = clip[:n - i0] * gain
+        seg = clip[:n - i0]
         if 'fade_out' in opt:
             a, b = opt['fade_out']
             ta = np.arange(len(seg)) / sr + start
             env = np.clip((b - ta) / max(b - a, 1e-3), 0, 1)
             seg = seg * env[:, None]
-            cut = int((b - start) * sr)
+            cut = max(0, int((b - start) * sr))
             seg[cut:] = 0
         dest = music if opt.get('music') else voice if opt.get('voice') else sfx
         dest[i0:i0 + len(seg)] += seg
-    # ducking: la música baja cuando hablan
+    # ducking fuerte: la música y el proyector bajan cuando hablan
     env = np.abs(voice).max(axis=1)
-    win = int(0.25 * sr)
-    k = np.ones(win, np.float32) / win
-    env = np.convolve(env, k, mode='same')
-    duck = 1.0 - 0.55 * np.clip(env / 0.08, 0, 1)
-    mix = music * duck[:, None] + voice * 1.0 + sfx + bed
+    win = int(0.30 * sr)
+    kern = np.ones(win, np.float32) / win
+    env = np.convolve(env, kern, mode='same')
+    # el ducking empieza un poco antes y suelta despacio
+    lead = int(0.12 * sr)
+    env = np.maximum(env, np.concatenate([env[lead:], np.zeros(lead, np.float32)]))
+    duck = 1.0 - 0.72 * np.clip(env / 0.04, 0, 1)
+    sfx_duck = 1.0 - 0.35 * np.clip(env / 0.04, 0, 1)
+    mix = music * duck[:, None] + voice + sfx * sfx_duck[:, None] + bed * duck[:, None]
+    # limitador suave
+    mix = np.tanh(mix * 1.1) / np.tanh(1.1)
     peak = np.abs(mix).max()
-    if peak > 0.95:
-        mix *= 0.95 / peak
+    if peak > 0.97:
+        mix *= 0.97 / peak
+    # medición: voz vs música cuando hay diálogo
+    act = env > 0.02
+    if act.any():
+        vr = np.sqrt((voice[act] ** 2).mean())
+        mr = np.sqrt(((music * duck[:, None])[act] ** 2).mean()) + 1e-9
+        print(f'voz/música durante diálogos: {20 * np.log10(vr / mr):+.1f} dB', flush=True)
     pcm = (mix * 32767).astype(np.int16)
     import wave
     with wave.open(path, 'wb') as wf:
@@ -680,6 +715,20 @@ def build_audio(cues, dur, path, sr=48000):
         wf.setsampwidth(2)
         wf.setframerate(sr)
         wf.writeframes(pcm.tobytes())
+
+
+def remux(tl_name, outname):
+    """Rehace solo el audio y lo mezcla con el video ya renderizado."""
+    timeline, cues = TIMELINES[tl_name]
+    dur = timeline[-1][1]
+    wav = os.path.join(OUT, outname + '.wav')
+    build_audio(cues, dur, wav)
+    src = os.path.join(OUT, outname + '.mp4')
+    tmp = os.path.join(OUT, outname + '_tmp.mp4')
+    subprocess.run(['ffmpeg', '-y', '-v', 'error', '-i', src, '-i', wav, '-map', '0:v', '-map', '1:a', '-c:v', 'copy',
+                    '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', tmp], check=True)
+    os.replace(tmp, src)
+    print('audio actualizado:', src)
 
 
 def render(tl_name, outname):
@@ -732,3 +781,6 @@ if __name__ == '__main__':
         render('preview', 'previa_1080p')
     elif cmd == 'full':
         render('full', 'krampus_1080p')
+    elif cmd == 'remux':
+        name = sys.argv[2] if len(sys.argv) > 2 else 'preview'
+        remux(name, 'previa_1080p' if name == 'preview' else 'krampus_1080p')
