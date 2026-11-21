@@ -1512,25 +1512,26 @@ def build_cameras(scene, P, V, roll, tau):
 
     # S7 — ascent: worm's-eye start, then crane up orbiting the climbing drone
     frames = list(range(1120, 1352))
-    def s7_des(f):
-        if f < 1150:
-            return Vector((-7.0, 898.0, 3.0))
-        th = math.radians(lerp(-30, 24, smootherstep(1150, 1344, f)))
-        R = lerp(15, 10.5, smootherstep(1150, 1344, f))
-        return Vector((R * math.sin(th), 969.0 - R * math.cos(th), max(3.0, D(f).z - 3.5)))
-    pos7 = spring_follow(frames, s7_des, 0.065)
-    tgt7 = spring_follow(frames, lambda f: D(f) + Vector((0, 0, 2.5)), 0.3)
+    worm = Vector((-6.0, 900.0, 3.0))
+    def s7_orbit(f):
+        th = math.radians(lerp(-35, 28, smootherstep(1150, 1344, f)))
+        R = lerp(8.5, 5.5, smootherstep(1150, 1344, f))
+        d = D(f)
+        return Vector((R * math.sin(th), d.y - R * math.cos(th), d.z - 1.6))
+    orbit7 = spring_follow_rel(frames, s7_orbit, D, 0.12)
+    tgt7 = spring_follow_rel(frames, lambda f: D(f) + Vector((0, 0, 0.6)), D, 0.3)
     def s7(f):
-        loc = pos7[f]
-        lens = lerp(18, 26, smootherstep(1150, 1300, f))
-        return loc, tgt7[f], lens, 5.6, (D(f) - loc).length, math.radians(lerp(4, -2, smoothstep(1128, 1344, f))), shake(f, 0.004, 0.07, 8)
+        w = smootherstep(1140, 1185, f)
+        loc = worm.lerp(orbit7[f], w)
+        lens = lerp(20, 30, smootherstep(1140, 1220, f))
+        return loc, tgt7[f], lens, 4.0, (D(f) - loc).length, math.radians(lerp(4, -2, smoothstep(1128, 1344, f))), shake(f, 0.004, 0.07, 8)
     run("S7_Ascent", 1128, 1344, s7)
 
     # S8 — the reveal: pull back from the drone to the whole city
     def s8(f):
         u = smootherstep(1362, 1500, f) ** 1.25
         d = D(f)
-        near = d + Vector((2.2, -7.5, 0.6)) + Vector((0, -2.0, 0.2)) * smoothstep(1344, 1365, f)
+        near = d + Vector((1.3, -4.6, 0.35)) + Vector((0.3, -1.2, 0.1)) * smoothstep(1344, 1365, f)
         far = Vector((-5.0, 640.0, 226.0))
         loc = near.lerp(far, u)
         tgt = (d + Vector((0, 0, 0.2))).lerp(Vector((0, 990, 150)), smootherstep(1366, 1480, f))
