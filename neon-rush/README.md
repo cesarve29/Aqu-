@@ -3,7 +3,9 @@
 Cortometraje cinematográfico de ~65 s (16:9, 1080p, 24 fps) generado 100 % por código en **Blender 5.3**:
 un dron de carreras despierta en una azotea bajo la lluvia, se lanza al vacío, persigue el tráfico
 volador por una avenida de neón, gira bajo un puente en cámara lenta y asciende hasta una torre
-monumental donde se enciende el letrero **NEON RUSH**.
+monumental donde se enciende el letrero **AISTUDIO3D**. La ciudad tiene ~3,400 autos voladores y a nivel
+de calle, ~500 peatones con paraguas luminosos, dirigibles con hologramas, 5 estilos de fachada y varios
+tipos de edificio (escalonados, podio + torre, torres gemelas con puente, coronas de vidrio).
 
 ## Tomas
 
@@ -19,7 +21,7 @@ monumental donde se enciende el letrero **NEON RUSH**.
 | S7 | 1128–1343 | Ascenso | Contrapicado y grúa orbital siguiendo la subida |
 | S8 | 1344–1487 | Revelación | Silueta frente al letrero y *pull-back* hasta la vista de la ciudad |
 
-Después vienen 3.5 s de tarjeta de título (ffmpeg).
+Después vienen 3.5 s de tarjeta de título AISTUDIO3D (ffmpeg).
 
 ## Archivos
 

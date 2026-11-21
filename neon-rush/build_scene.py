@@ -234,29 +234,54 @@ def build_materials():
     geo = b.new("ShaderNodeNewGeometry")
     attr = b.new("ShaderNodeAttribute", attribute_name="rnd", attribute_type="GEOMETRY")
     rnd = attr.outputs["Fac"]
+    sattr = b.new("ShaderNodeAttribute", attribute_name="style", attribute_type="GEOMETRY")
+    style = sattr.outputs["Fac"]
     px, py, pz = b.sep(geo.outputs["Position"])
     nx, ny, nz = b.sep(geo.outputs["Normal"])
     facade = b.math("LESS_THAN", b.math("ABSOLUTE", nz), 0.5)
     h = b.math("ADD", px, py)
-    wsize = b.math("MULTIPLY_ADD", rnd, 1.2, 2.2)          # window width 2.2..3.4
+    # facade style parameters (5 styles): grid, ribbon, vertical slits, glass curtain, small apartments
+    # R: window pitch/10, G: floor height/10, B: x-mask margin, A: z-mask margin
+    prm = b.new("ShaderNodeValToRGB")
+    prm.color_ramp.interpolation = "CONSTANT"
+    els = prm.color_ramp.elements
+    specs = [(0.0, (0.26, 0.36, 0.18, 0.30)), (0.2, (0.60, 0.38, 0.0, 0.32)), (0.4, (0.17, 0.40, 0.36, 0.0)),
+             (0.6, (0.80, 0.42, 0.0, 0.0)), (0.8, (0.15, 0.30, 0.20, 0.28))]
+    els[0].position, els[0].color = specs[0][0], specs[0][1]
+    for pos, col in specs[1:]:
+        e = els.new(pos)
+        e.color = col
+    b.link_or_set(prm.inputs[0], style)
+    pr, pg, pb = b.sep(prm.outputs["Color"])
+    pa = prm.outputs["Alpha"]
+    # R: lit ratio, G: brightness, B: glassiness
+    prm2 = b.ramp(style, [(0.0, (0.16, 0.9, 0.0)), (0.2, (0.24, 1.1, 0.0)), (0.4, (0.20, 1.3, 0.2)),
+                          (0.6, (0.12, 0.65, 1.0)), (0.8, (0.30, 0.85, 0.0))], "CONSTANT")
+    q_ratio, q_bright, q_glass = b.sep(prm2)
+    wsize = b.math("MULTIPLY", b.math("MULTIPLY", pr, 10.0), b.math("MULTIPLY_ADD", rnd, 0.3, 0.85))
+    fh = b.math("MULTIPLY", pg, 10.0)
     cx = b.math("DIVIDE", h, wsize)
-    cz = b.math("DIVIDE", pz, 3.6)
+    cz = b.math("DIVIDE", pz, fh)
     fx = b.math("FRACT", cx)
     fz = b.math("FRACT", cz)
-    mx = b.math("MULTIPLY", b.math("GREATER_THAN", fx, 0.18), b.math("LESS_THAN", fx, 0.82))
-    mz = b.math("MULTIPLY", b.math("GREATER_THAN", fz, 0.30), b.math("LESS_THAN", fz, 0.80))
+    mx = b.math("MULTIPLY", b.math("GREATER_THAN", fx, pb), b.math("LESS_THAN", fx, b.math("SUBTRACT", 1.0, pb)))
+    mz = b.math("MULTIPLY", b.math("GREATER_THAN", fz, pa),
+                b.math("LESS_THAN", fz, b.math("SUBTRACT", 1.0, b.math("MULTIPLY", pa, 0.6))))
     win = b.math("MULTIPLY", b.math("MULTIPLY", mx, mz), facade)
+    win = b.math("MAXIMUM", win, b.math("MULTIPLY", q_glass, facade))      # curtain wall = all glass
     cell = b.comb(b.math("FLOOR", cx), b.math("FLOOR", cz), b.math("MULTIPLY", rnd, 137.0))
     wn = b.new("ShaderNodeTexWhiteNoise", noise_dimensions="3D")
     b.link_or_set(wn.inputs["Vector"], cell)
-    lit_ratio = b.math("MULTIPLY_ADD", rnd, 0.22, 0.08)
+    lit_ratio = b.math("MULTIPLY", q_ratio, b.math("MULTIPLY_ADD", rnd, 0.9, 0.6))
     lit = b.math("GREATER_THAN", wn.outputs["Value"], b.math("SUBTRACT", 1.0, lit_ratio))
+    lit = b.math("MULTIPLY", lit, b.math("MULTIPLY", b.math("MULTIPLY", mx, mz), facade))
     wn2 = b.new("ShaderNodeTexWhiteNoise", noise_dimensions="4D")
     b.link_or_set(wn2.inputs["Vector"], cell)
     wn2.inputs["W"].default_value = 3.7
-    wcol = b.ramp(wn2.outputs["Value"], [
-        (0.00, (1.0, 0.62, 0.32)), (0.40, (1.0, 0.82, 0.60)), (0.62, (0.62, 0.80, 1.0)),
-        (0.80, (0.40, 0.95, 1.0)), (0.90, (1.0, 0.25, 0.65)), (0.96, (0.65, 0.35, 1.0))], "CONSTANT")
+    cbias = b.math("MULTIPLY", b.math("FRACT", b.math("MULTIPLY", rnd, 3.3)), 0.45)
+    wcol = b.ramp(b.math("MULTIPLY_ADD", wn2.outputs["Value"], 0.55, cbias), [
+        (0.00, (1.0, 0.58, 0.28)), (0.30, (1.0, 0.80, 0.58)), (0.52, (0.92, 0.92, 1.0)), (0.66, (0.62, 0.80, 1.0)),
+        (0.80, (0.40, 0.95, 1.0)), (0.90, (1.0, 0.25, 0.65)), (0.95, (0.65, 0.35, 1.0))], "CONSTANT")
     # storefront band at street level
     shop = b.math("MULTIPLY", b.math("LESS_THAN", pz, 4.6), facade)
     shop = b.math("MULTIPLY", shop, b.math("GREATER_THAN", pz, 0.4))
@@ -270,29 +295,29 @@ def build_materials():
     shop_col = b.ramp(wn3.outputs["Value"], [
         (0.0, (1.0, 0.55, 0.25)), (0.45, (1.0, 0.2, 0.55)), (0.65, (0.2, 0.9, 1.0)),
         (0.82, (1.0, 0.8, 0.5)), (0.92, (0.6, 0.3, 1.0))], "CONSTANT")
-    # window flicker: a few windows blink slowly
-    t = b.time_value()
     wvar = b.math("MULTIPLY_ADD", wn.outputs["Value"], 1.6, 0.25)
-    emis_w = b.math("MULTIPLY", b.math("MULTIPLY", win, lit), b.math("MULTIPLY", wvar, b.math("MULTIPLY_ADD", rnd, 0.8, 0.6)))
-    emis_w = b.math("MULTIPLY", emis_w, b.math("LESS_THAN", pz, 1e9))
+    emis_w = b.math("MULTIPLY", lit, b.math("MULTIPLY", wvar, b.math("MULTIPLY", q_bright, b.math("MULTIPLY_ADD", rnd, 0.8, 0.6))))
     emis_s = b.math("MULTIPLY", shop_m, 1.7)
     emis_strength = b.math("ADD", emis_w, emis_s)
     emis_col = b.mix(shop_m, wcol, shop_col)
-    # base surfaces: concrete / dark glass / wet roof
+    # base surfaces: varied concrete tints / dark glass / wet roof
     nzpos = b.new("ShaderNodeTexNoise")
     b.link_or_set(nzpos.inputs["Vector"], geo.outputs["Position"])
     nzpos.inputs["Scale"].default_value = 0.35
     nzpos.inputs["Detail"].default_value = 1.5
-    wall_col = b.mix(b.math("MULTIPLY", rnd, 1.0), (0.018, 0.018, 0.024), (0.05, 0.045, 0.06))
+    wall_col = b.ramp(b.math("FRACT", b.math("MULTIPLY", rnd, 7.13)), [
+        (0.0, (0.020, 0.020, 0.026)), (0.2, (0.055, 0.045, 0.040)), (0.4, (0.030, 0.038, 0.055)),
+        (0.6, (0.070, 0.068, 0.072)), (0.8, (0.012, 0.012, 0.016))], "CONSTANT")
     wall_col = b.mix(b.math("MULTIPLY", nzpos.outputs["Fac"], 0.6), wall_col, (0.01, 0.01, 0.014))
-    glass_col = (0.008, 0.012, 0.02)
+    glass_col = b.mix(q_glass, (0.008, 0.012, 0.02), (0.02, 0.035, 0.06))
     base = b.mix(win, wall_col, glass_col)
     puddle = b.math("GREATER_THAN", nzpos.outputs["Fac"], 0.52)
     roof_rough = b.mixf(puddle, 0.45, 0.04)
-    rough = b.mixf(facade, roof_rough, b.mixf(win, 0.55, 0.06))
+    rough = b.mixf(facade, roof_rough, b.mixf(win, 0.55, b.mixf(q_glass, 0.06, 0.03)))
     p = b.new("ShaderNodeBsdfPrincipled")
     b.link_or_set(p.inputs["Base Color"], base)
     b.link_or_set(p.inputs["Roughness"], rough)
+    b.link_or_set(p.inputs["Metallic"], b.math("MULTIPLY", q_glass, b.math("MULTIPLY", win, 0.6)))
     b.link_or_set(p.inputs["Emission Color"], emis_col)
     b.link_or_set(p.inputs["Emission Strength"], emis_strength)
     p.inputs["Specular IOR Level"].default_value = 0.6
@@ -518,9 +543,9 @@ def iter_fcurves(action):
 # ----------------------------------------------------------------------------
 class MeshBuilder:
     def __init__(self):
-        self.v, self.f, self.rnd, self.mat = [], [], [], []
+        self.v, self.f, self.rnd, self.mat, self.style = [], [], [], [], []
 
-    def box(self, x0, x1, y0, y1, z0, z1, rnd=0.0, mat=0, top=True, bottom=False):
+    def box(self, x0, x1, y0, y1, z0, z1, rnd=0.0, mat=0, top=True, bottom=False, style=0.0):
         b = len(self.v)
         self.v += [(x0, y0, z0), (x1, y0, z0), (x1, y1, z0), (x0, y1, z0),
                    (x0, y0, z1), (x1, y0, z1), (x1, y1, z1), (x0, y1, z1)]
@@ -533,6 +558,7 @@ class MeshBuilder:
             self.f.append(tuple(b + i for i in fc))
             self.rnd.append(rnd)
             self.mat.append(mat)
+            self.style.append(style)
 
     def cbox(self, c, size, rnd=0.0, mat=0, bottom=True):
         x, y, z = c
@@ -545,6 +571,8 @@ class MeshBuilder:
         me.update()
         a = me.attributes.new("rnd", "FLOAT", "FACE")
         a.data.foreach_set("value", self.rnd)
+        a2 = me.attributes.new("style", "FLOAT", "FACE")
+        a2.data.foreach_set("value", self.style)
         for m in mats:
             me.materials.append(m)
         me.polygons.foreach_set("material_index", self.mat)
@@ -648,7 +676,9 @@ def build_city(fonts):
                     # nothing directly around the hero roof may be too low/high weirdly
                     if y0 == 7 and lx0 >= 16 and lx0 < 70:
                         hgt = max(hgt, 70)
-                    add_tower(bmb, det, blink, neon, bx0, bx1, by0, by1, hgt, r)
+                    if not near and RNG.random() < 0.05:
+                        hgt = RNG.uniform(240, 310)
+                    add_tower(bmb, det, blink, neon, bx0, bx1, by0, by1, hgt, r, front)
                     if front:
                         word_i = add_signage(fonts, signs, signbody, neon, bx0, bx1, by0, by1, hgt, lx0 == 16, word_i)
 
@@ -687,10 +717,10 @@ def build_city(fonts):
 
     # --- the gate tower (finale) ---------------------------------------------------
     gw, go, gt = GATE_HALF_W, GATE_OPEN_HALF, GATE_OPEN_TOP
-    bmb.box(-gw, -go, GATE_Y0, GATE_Y1, 0, gt, 0.91, top=False)
-    bmb.box(go, gw, GATE_Y0, GATE_Y1, 0, gt, 0.93, top=False)
-    bmb.box(-gw, gw, GATE_Y0, GATE_Y1, gt, GATE_H, 0.95, bottom=True)
-    bmb.box(-gw + 10, gw - 10, GATE_Y0 + 6, GATE_Y1 - 6, GATE_H, GATE_H + 30, 0.97)
+    bmb.box(-gw, -go, GATE_Y0, GATE_Y1, 0, gt, 0.91, top=False, style=0.1)
+    bmb.box(go, gw, GATE_Y0, GATE_Y1, 0, gt, 0.93, top=False, style=0.1)
+    bmb.box(-gw, gw, GATE_Y0, GATE_Y1, gt, GATE_H, 0.95, bottom=True, style=0.7)
+    bmb.box(-gw + 10, gw - 10, GATE_Y0 + 6, GATE_Y1 - 6, GATE_H, GATE_H + 30, 0.97, style=0.7)
     det.box(-0.4, 0.4, GATE_Y0 + 18, GATE_Y0 + 19, GATE_H + 30, GATE_H + 75, 0.0)
     blink.cbox((0, GATE_Y0 + 18.5, GATE_H + 75.5), (1.2, 1.2, 1.2))
     cy = GATE_Y0 - 0.15
@@ -729,6 +759,7 @@ def build_city(fonts):
     blink.build("AircraftLights", [MATS["blink"]], city)
     lamps.build("LampHeads", [MATS["lamp"]], city)
     signbody.build("SignBodies", [MATS["signbody"]], signs)
+    build_rooftop_holos(signs)
 
     # cloud ceiling
     cl = bpy.data.meshes.new("Clouds")
@@ -749,37 +780,121 @@ def lamps_pole(det, lamps, x, y, side):
     lamps.box(hx - 0.6, hx + 0.6, y - 0.18, y + 0.18, 6.85, 7.0, 0.0, bottom=True)
 
 
-def add_tower(bmb, det, blink, neon, x0, x1, y0, y1, h, r):
-    tiers = 1 + (h > 60) + (h > 130)
-    z0 = 0.0
+HOLO_SPECS = []   # rooftop billboards created after the city mesh
+
+
+def stepped(bmb, x0, x1, y0, y1, z0, h, r, style):
+    tiers = 1 + (h - z0 > 60) + (h - z0 > 130)
     cx0, cx1, cy0, cy1 = x0, x1, y0, y1
     for t in range(tiers):
         zt = h if t == tiers - 1 else z0 + (h - z0) * RNG.uniform(0.45, 0.7)
-        bmb.box(cx0, cx1, cy0, cy1, z0, zt, (r + 0.13 * t) % 1.0)
+        bmb.box(cx0, cx1, cy0, cy1, z0, zt, (r + 0.13 * t) % 1.0, style=style)
         z0 = zt
         ins = RNG.uniform(1.5, 4.5)
         if cx1 - cx0 > 2 * ins + 6 and cy1 - cy0 > 2 * ins + 6:
             cx0, cx1, cy0, cy1 = cx0 + ins, cx1 - ins, cy0 + ins, cy1 - ins
-    # rooftop clutter
-    for _ in range(RNG.randint(0, 3)):
-        w, d = RNG.uniform(1.5, 4), RNG.uniform(1.5, 4)
-        if cx1 - cx0 > w + 2 and cy1 - cy0 > d + 2:
-            ax = RNG.uniform(cx0 + 1, cx1 - 1 - w)
-            ay = RNG.uniform(cy0 + 1, cy1 - 1 - d)
-            det.box(ax, ax + w, ay, ay + d, h, h + RNG.uniform(1, 3), 0.0)
-    if h > 90:
-        ax, ay = (cx0 + cx1) / 2, (cy0 + cy1) / 2
-        ah = RNG.uniform(6, 18)
-        det.box(ax - 0.2, ax + 0.2, ay - 0.2, ay + 0.2, h, h + ah, 0.0)
-        blink.cbox((ax, ay, h + ah + 0.3), (0.6, 0.6, 0.6))
-    # roof edge neon outline on some towers
-    if RNG.random() < 0.22:
+    return cx0, cx1, cy0, cy1
+
+
+def add_fins(det, x0, x1, y0, y1, z0, z1, pitch):
+    """Vertical fins on all four facades (adds relief and breaks repetition)."""
+    n = int((x1 - x0) / pitch)
+    for i in range(1, n):
+        x = x0 + i * (x1 - x0) / n
+        det.box(x - 0.15, x + 0.15, y0 - 0.7, y0, z0, z1, 0.0)
+        det.box(x - 0.15, x + 0.15, y1, y1 + 0.7, z0, z1, 0.0)
+    n = int((y1 - y0) / pitch)
+    for i in range(1, n):
+        y = y0 + i * (y1 - y0) / n
+        det.box(x0 - 0.7, x0, y - 0.15, y + 0.15, z0, z1, 0.0)
+        det.box(x1, x1 + 0.7, y - 0.15, y + 0.15, z0, z1, 0.0)
+
+
+def add_tower(bmb, det, blink, neon, x0, x1, y0, y1, h, r, front=False):
+    style = RNG.random()
+    kind = RNG.random()
+    w, d = x1 - x0, y1 - y0
+    tops = []
+    if kind < 0.38 or h < 40:                                   # stepped tiers
+        tops.append((*stepped(bmb, x0, x1, y0, y1, 0.0, h, r, style), h))
+        if RNG.random() < 0.3 and w > 14 and d > 14:
+            add_fins(det, x0, x1, y0, y1, 4.5, min(h, h * 0.6 if h > 60 else h), RNG.uniform(3.5, 6.0))
+    elif kind < 0.6 and not front and min(w, d) > 18:         # podium + slender tower
+        ph = RNG.uniform(10, 24)
+        bmb.box(x0, x1, y0, y1, 0, ph, r, style=RNG.random())
+        ins = min(w, d) * RNG.uniform(0.18, 0.3)
+        t0 = (x0 + ins, x1 - ins, y0 + ins, y1 - ins)
+        tops.append((*stepped(bmb, *t0, ph, h, (r + 0.31) % 1, style), h))
+        if RNG.random() < 0.4:
+            add_fins(det, *t0, ph + 2, h - 2, RNG.uniform(3.0, 5.0))
+    elif kind < 0.8 and max(w, d) > 22:                         # twin towers + skybridge
+        h2 = h * RNG.uniform(0.7, 0.95)
+        g = RNG.uniform(4, 7)
+        if d >= w:
+            ym = (y0 + y1) / 2
+            a, bb = (x0, x1, y0, ym - g / 2), (x0, x1, ym + g / 2, y1)
+            br = (x0 + 2, x1 - 2, ym - g / 2, ym + g / 2)
+        else:
+            xm = (x0 + x1) / 2
+            a, bb = (x0, xm - g / 2, y0, y1), (xm + g / 2, x1, y0, y1)
+            br = (xm - g / 2, xm + g / 2, y0 + 2, y1 - 2)
+        tops.append((*stepped(bmb, *a, 0.0, h, r, style), h))
+        tops.append((*stepped(bmb, *bb, 0.0, h2, (r + 0.5) % 1, style), h2))
+        zb = min(h, h2) * RNG.uniform(0.45, 0.75)
+        bmb.box(*br, zb, zb + 4.0, (r + 0.2) % 1, bottom=True, style=0.65)
+        neon.box(br[0], br[1], br[2], br[3], zb - 0.15, zb, 0.0, RNG.randrange(len(NEON_KEYS)), bottom=True)
+    else:                                                       # slab with a glass crown
+        zc = h * RNG.uniform(0.86, 0.93)
+        bmb.box(x0, x1, y0, y1, 0, zc, r, style=style)
+        bmb.box(x0 + 1.2, x1 - 1.2, y0 + 1.2, y1 - 1.2, zc, h, (r + 0.4) % 1, style=0.7)
         k = RNG.randrange(len(NEON_KEYS))
-        zz = h - 0.4
-        neon.box(cx0 - 0.1, cx1 + 0.1, cy0 - 0.1, cy0, zz, zz + 0.25, 0.0, k, bottom=True)
-        neon.box(cx0 - 0.1, cx1 + 0.1, cy1, cy1 + 0.1, zz, zz + 0.25, 0.0, k, bottom=True)
-        neon.box(cx0 - 0.1, cx0, cy0, cy1, zz, zz + 0.25, 0.0, k, bottom=True)
-        neon.box(cx1, cx1 + 0.1, cy0, cy1, zz, zz + 0.25, 0.0, k, bottom=True)
+        for zz in (zc - 0.1, h - 0.3):
+            neon.box(x0 - 0.1, x1 + 0.1, y0 - 0.1, y0, zz, zz + 0.25, 0.0, k, bottom=True)
+            neon.box(x0 - 0.1, x1 + 0.1, y1, y1 + 0.1, zz, zz + 0.25, 0.0, k, bottom=True)
+            neon.box(x0 - 0.1, x0, y0, y1, zz, zz + 0.25, 0.0, k, bottom=True)
+            neon.box(x1, x1 + 0.1, y0, y1, zz, zz + 0.25, 0.0, k, bottom=True)
+        tops.append((x0 + 1.2, x1 - 1.2, y0 + 1.2, y1 - 1.2, h))
+    for (cx0, cx1, cy0, cy1, th) in tops:
+        # rooftop clutter
+        for _ in range(RNG.randint(0, 3)):
+            ww, dd = RNG.uniform(1.5, 4), RNG.uniform(1.5, 4)
+            if cx1 - cx0 > ww + 2 and cy1 - cy0 > dd + 2:
+                ax = RNG.uniform(cx0 + 1, cx1 - 1 - ww)
+                ay = RNG.uniform(cy0 + 1, cy1 - 1 - dd)
+                det.box(ax, ax + ww, ay, ay + dd, th, th + RNG.uniform(1, 3), 0.0)
+        if th > 90:
+            ax, ay = (cx0 + cx1) / 2, (cy0 + cy1) / 2
+            ah = RNG.uniform(6, 22)
+            det.box(ax - 0.2, ax + 0.2, ay - 0.2, ay + 0.2, th, th + ah, 0.0)
+            blink.cbox((ax, ay, th + ah + 0.3), (0.6, 0.6, 0.6))
+        # LED crown band or roof outline
+        if RNG.random() < 0.25:
+            k = RNG.randrange(len(NEON_KEYS))
+            zz = th - RNG.choice((0.4, 2.5, 4.0))
+            neon.box(cx0 - 0.1, cx1 + 0.1, cy0 - 0.1, cy0, zz, zz + 0.3, 0.0, k, bottom=True)
+            neon.box(cx0 - 0.1, cx1 + 0.1, cy1, cy1 + 0.1, zz, zz + 0.3, 0.0, k, bottom=True)
+            neon.box(cx0 - 0.1, cx0, cy0, cy1, zz, zz + 0.3, 0.0, k, bottom=True)
+            neon.box(cx1, cx1 + 0.1, cy0, cy1, zz, zz + 0.3, 0.0, k, bottom=True)
+        # rooftop holographic billboard
+        if 25 < th < 140 and RNG.random() < 0.09 and cx1 - cx0 > 12 and cy1 - cy0 > 12:
+            HOLO_SPECS.append(((cx0 + cx1) / 2, (cy0 + cy1) / 2, th, RNG.randrange(4), RNG.uniform(12, 20)))
+            det.box((cx0 + cx1) / 2 - 0.3, (cx0 + cx1) / 2 + 0.3, (cy0 + cy1) / 2 - 0.3, (cy0 + cy1) / 2 + 0.3,
+                    th, th + 4, 0.0)
+
+
+def build_rooftop_holos(coll):
+    for (x, y, z, face, w) in HOLO_SPECS:
+        hh = w * 0.56
+        z0 = z + 4.0
+        ang = face * math.pi / 2
+        dx, dy = math.cos(ang) * w / 2, math.sin(ang) * w / 2
+        me = bpy.data.meshes.new("RoofHolo")
+        me.from_pydata([(x - dx, y - dy, z0), (x + dx, y + dy, z0), (x + dx, y + dy, z0 + hh), (x - dx, y - dy, z0 + hh)],
+                       [], [(0, 1, 2, 3)])
+        me.materials.append(MATS[f"holo{RNG.randrange(4)}"])
+        ob = bpy.data.objects.new("RoofHolo", me)
+        coll.objects.link(ob)
+    print("rooftop billboards:", len(HOLO_SPECS))
 
 
 def add_signage(fonts, coll, signbody, neon, x0, x1, y0, y1, h, east, word_i):
@@ -857,22 +972,34 @@ def add_signage(fonts, coll, signbody, neon, x0, x1, y0, y1, h, east, word_i):
 SIGN_ON = (1262, 1300)
 
 
+SIGN_TEXT, SIGN_SPLIT = "AISTUDIO3D", 8      # characters >= SIGN_SPLIT use the accent colour
+SIGN_Z, SIGN_WIDTH = 168.0, 98.0
+
+
 def build_gate_sign(fonts):
     coll = new_collection("GateSign")
-    mats = []
-    for name, col, z, size in (("NEON", NEON["magenta"], 172.0, 26.0), ("RUSH", NEON["cyan"], 138.0, 26.0)):
-        m = emission_material("Hero_" + name, col, 0.0)
-        mats.append(m)
-        t = add_text(name, size, m, (0, GATE_Y0 - 1.2, z), (math.radians(90), 0, 0), coll,
-                     fonts["display"], extrude=0.5)
-        # dim backing glow plate
+    m_main = emission_material("Hero_Main", NEON["magenta"], 0.0)
+    m_acc = emission_material("Hero_Accent", NEON["cyan"], 0.0)
+    t = add_text(SIGN_TEXT, 20.0, m_main, (0, GATE_Y0 - 1.2, SIGN_Z), (math.radians(90), 0, 0), coll,
+                 fonts["display"], extrude=0.5)
+    cu = t.data
+    cu.materials.append(m_acc)
+    for i in range(SIGN_SPLIT, len(SIGN_TEXT)):
+        cu.body_format[i].material_index = 1
+    bpy.context.view_layer.update()
+    width = t.dimensions.x
+    cu.size = 20.0 * SIGN_WIDTH / max(1e-3, width)
+    bpy.context.view_layer.update()
+    cap = t.dimensions.y
+    print("sign size", round(cu.size, 2), "dims", tuple(round(v, 1) for v in t.dimensions))
     # frame
     fr = MeshBuilder()
-    fr.box(-50, 50, GATE_Y0 - 0.9, GATE_Y0 - 0.6, 119.0, 119.5, 0.0, bottom=True)
-    fr.box(-50, 50, GATE_Y0 - 0.9, GATE_Y0 - 0.6, 191.0, 191.5, 0.0, bottom=True)
+    half = SIGN_WIDTH / 2 + 5
+    for zz in (SIGN_Z - cap / 2 - 7, SIGN_Z + cap / 2 + 7):
+        fr.box(-half, half, GATE_Y0 - 0.9, GATE_Y0 - 0.6, zz, zz + 0.5, 0.0, bottom=True)
     fm = emission_material("Hero_Frame", NEON["violet"], 0.0)
-    mats.append(fm)
     fr.build("HeroFrame", [fm], coll)
+    mats = [m_main, m_acc, fm]
     # power-on flicker
     rng = random.Random(5)
     for m, peak in zip(mats, (22.0, 22.0, 10.0)):
@@ -922,50 +1049,170 @@ def car_mesh(glow_key):
     return me
 
 
+def drive_linear(ob, idx, pos, vel_per_frame, scene):
+    fc = ob.driver_add("location", idx)
+    drv = fc.driver
+    drv.type = "SCRIPTED"
+    var = drv.variables.new()
+    var.name = "t"
+    var.type = "SINGLE_PROP"
+    var.targets[0].id_type = "SCENE"
+    var.targets[0].id = scene
+    var.targets[0].data_path = '["tau"]'
+    drv.expression = f"{pos:.3f}+{vel_per_frame:.5f}*t"
+
+
 def build_traffic(scene):
     coll = new_collection("Traffic")
     meshes = [car_mesh(k) for k in ("magenta", "cyan", "violet")]
     T = (F_END + 40) / FPS
-    lanes = []
+    lanes = []   # axis, cross-coordinate, z, dir, lo, hi, speed range, spacing range
+    air = ((20, 34), (30, 75))
     for (x, z, d) in [(-8, 28, -1), (8, 28, 1), (-4, 36, -1), (4, 36, 1), (-6.5, 47, -1), (6.5, 47, 1),
                       (-3, 61, -1), (3, 61, 1), (-9, 80, -1), (9, 92, 1)]:
-        lanes.append(("Y", x, z, d, -700.0, 1900.0))
-    for k in range(-6, 22, 2):
+        lanes.append(("Y", x, z, d, -700.0, 1900.0, *air))
+    # street-level traffic on the avenue (hovering just above the wet asphalt)
+    for (x, d) in [(-9.6, -1), (-6.0, -1), (-2.4, -1), (2.4, 1), (6.0, 1), (9.6, 1)]:
+        lanes.append(("Y", x, 0.75, d, -700.0, 1900.0, (11, 19), (14, 42)))
+    # background streams of light above the outer blocks
+    for (x, z, d) in [(-105, 72, 1), (-112, 88, -1), (105, 80, -1), (172, 110, 1), (-175, 125, -1),
+                      (240, 95, -1), (-238, 140, 1), (310, 120, 1)]:
+        lanes.append(("Y", x, z, d, -700.0, 1900.0, (24, 36), (40, 90)))
+    for k in range(-6, 24, 2):
         yc = 70 * k
-        lanes.append(("X", yc - 2.5, 33 + (k % 4) * 3, 1, -520.0, 520.0))
-        lanes.append(("X", yc + 2.5, 52 + (k % 3) * 4, -1, -520.0, 520.0))
+        lanes.append(("X", yc - 2.5, 33 + (k % 4) * 3, 1, -520.0, 520.0, (20, 34), (60, 130)))
+        lanes.append(("X", yc + 2.5, 52 + (k % 3) * 4, -1, -520.0, 520.0, (20, 34), (60, 130)))
+        if -2 <= k <= 16:
+            lanes.append(("X", yc - 3.0, 0.75, 1, -300.0, 300.0, (10, 16), (40, 110)))
+            lanes.append(("X", yc + 3.0, 0.75, -1, -300.0, 300.0, (10, 16), (40, 110)))
     n = 0
-    for (axis, c, z, d, lo, hi) in lanes:
-        v = RNG.uniform(20, 34)  # m/s
+    for (axis, c, z, d, lo, hi, vr, sp) in lanes:
+        v = RNG.uniform(*vr)
         span = v * T
         pos = lo - span if d > 0 else lo
         end = hi if d > 0 else hi + span
+        ground = z < 2
         while pos < end:
-            pos += RNG.uniform(45, 110) if axis == "Y" else RNG.uniform(70, 160)
+            pos += RNG.uniform(*sp)
             vv = v * RNG.uniform(0.92, 1.08)
             ob = bpy.data.objects.new(f"Car{n:04d}", RNG.choice(meshes))
             coll.objects.link(ob)
-            zz = z + RNG.uniform(-1.2, 1.2)
+            zz = z + (RNG.uniform(-0.15, 0.15) if ground else RNG.uniform(-1.2, 1.2))
+            jitter = RNG.uniform(-0.3, 0.3) if ground else RNG.uniform(-0.6, 0.6)
             if axis == "Y":
-                ob.location = (c + RNG.uniform(-0.6, 0.6), pos, zz)
+                # skip ground cars that would sit inside the gate tower's solid pillars
+                ob.location = (c + jitter, pos, zz)
                 ob.rotation_euler = (0, 0, 0 if d > 0 else math.pi)
                 idx = 1
             else:
-                ob.location = (pos, c, zz)
+                ob.location = (pos, c + jitter, zz)
                 ob.rotation_euler = (0, 0, -math.pi / 2 if d > 0 else math.pi / 2)
                 idx = 0
-            fc = ob.driver_add("location", idx)
-            drv = fc.driver
-            drv.type = "SCRIPTED"
-            var = drv.variables.new()
-            var.name = "t"
-            var.type = "SINGLE_PROP"
-            var.targets[0].id_type = "SCENE"
-            var.targets[0].id = scene
-            var.targets[0].data_path = '["tau"]'
-            drv.expression = f"{pos:.3f}+{d * vv / FPS:.5f}*t"
+            drive_linear(ob, idx, pos, d * vv / FPS, scene)
             n += 1
     print("cars:", n)
+
+
+def person_mesh(umb_key):
+    bm = bmesh.new()
+    def part(c, s, idx, kind="cube"):
+        if kind == "cube":
+            r = bmesh.ops.create_cube(bm, size=1.0)
+        elif kind == "cyl":
+            r = bmesh.ops.create_cone(bm, cap_ends=True, segments=8, radius1=0.5, radius2=0.5, depth=1.0)
+        elif kind == "umb":
+            r = bmesh.ops.create_cone(bm, cap_ends=False, segments=12, radius1=0.5, radius2=0.02, depth=1.0)
+        else:
+            r = bmesh.ops.create_uvsphere(bm, u_segments=8, v_segments=6, radius=0.5)
+        for v in r["verts"]:
+            v.co = Vector((v.co.x * s[0] + c[0], v.co.y * s[1] + c[1], v.co.z * s[2] + c[2]))
+        for f in {fc for v in r["verts"] for fc in v.link_faces}:
+            f.material_index = idx
+    part((0, 0, 0.95), (0.42, 0.3, 1.3), 0, "cyl")       # coat
+    part((0, 0, 1.72), (0.22, 0.22, 0.24), 0, "sph")     # head
+    if umb_key:
+        part((0, 0, 1.98), (0.004, 0.004, 0.55), 0)        # shaft
+        part((0, 0, 2.18), (1.15, 1.15, 0.28), 1, "umb")   # canopy
+        r = bmesh.ops.create_cone(bm, cap_ends=False, segments=12, radius1=0.585, radius2=0.585, depth=0.04)
+        for v in r["verts"]:
+            v.co = Vector((v.co.x, v.co.y, v.co.z + 2.05))
+        for f in {fc for v in r["verts"] for fc in v.link_faces}:
+            f.material_index = 2
+    me = bpy.data.meshes.new("Person_" + (umb_key or "none"))
+    bm.to_mesh(me)
+    bm.free()
+    me.materials.append(MATS["coat"])
+    me.materials.append(MATS["umbrella"])
+    me.materials.append(MATS["neon_" + (umb_key or "cyan")])
+    return me
+
+
+def build_pedestrians(scene):
+    coll = new_collection("Pedestrians")
+    MATS["coat"] = principled_material("Coat", (0.02, 0.02, 0.025), rough=0.35)
+    MATS["umbrella"] = principled_material("Umbrella", (0.01, 0.012, 0.02), rough=0.08, coat=1.0)
+    keys = ["cyan", "magenta", "violet", "warm", "cyan", "orange", None, None]
+    meshes = {k: person_mesh(k) for k in set(keys)}
+    n = 0
+    for side in (-1, 1):
+        y = -620.0
+        while y < 880:
+            y += RNG.uniform(2.5, 9.0)
+            x = side * RNG.uniform(12.6, 15.4)
+            ob = bpy.data.objects.new(f"Ped{n:04d}", meshes[RNG.choice(keys)])
+            coll.objects.link(ob)
+            ob.location = (x, y, 0.18)
+            moving = RNG.random() < 0.8
+            d = RNG.choice((-1, 1))
+            ob.rotation_euler = (0, 0, (0 if d > 0 else math.pi) if moving else RNG.uniform(0, 2 * math.pi))
+            if moving:
+                drive_linear(ob, 1, y, d * RNG.uniform(1.0, 1.6) / FPS, scene)
+            n += 1
+    print("pedestrians:", n)
+
+
+def build_blimps():
+    coll = new_collection("Blimps")
+    for i, (p0, p1, rotz, holo) in enumerate((
+            ((-300, 420, 240), (-60, 420, 240), math.pi / 2, 0),
+            ((120, 1200, 205), (40, 1200, 205), math.pi / 2, 1))):
+        bm = bmesh.new()
+        bmesh.ops.create_uvsphere(bm, u_segments=32, v_segments=16, radius=0.5)
+        for v in bm.verts:
+            v.co = Vector((v.co.x * 16, v.co.y * 62, v.co.z * 16))
+        r = bmesh.ops.create_cube(bm, size=1.0)
+        for v in r["verts"]:
+            v.co = Vector((v.co.x * 5, v.co.y * 14, v.co.z * 3 - 9))
+        me = bpy.data.meshes.new("Blimp")
+        bm.to_mesh(me)
+        bm.free()
+        me.materials.append(MATS["metal"])
+        for p in me.polygons:
+            p.use_smooth = True
+        ob = bpy.data.objects.new(f"Blimp{i}", me)
+        coll.objects.link(ob)
+        ob.rotation_euler = (0, 0, rotz)
+        # holo screens on both flanks
+        for sx in (-1, 1):
+            sm = bpy.data.meshes.new("BlimpScreen")
+            x = sx * 15.2
+            sm.from_pydata([(x, -30, -7), (x, 30, -7), (x, 30, 7), (x, -30, 7)], [], [(0, 1, 2, 3)])
+            sm.materials.append(MATS[f"holo{(holo + (sx > 0)) % 4}"])
+            so = bpy.data.objects.new("BlimpScreen", sm)
+            so.parent = ob
+            coll.objects.link(so)
+        for yy in (-58, 58):
+            bmb = MeshBuilder()
+            bmb.cbox((0, yy, 0), (1.5, 1.5, 1.5))
+            bl = bmb.build("BlimpLight", [MATS["blink"]], coll)
+            bl.parent = ob
+        for f, loc in ((0, p0), (F_END, p1)):
+            ob.location = loc
+            ob.keyframe_insert("location", frame=f)
+        if ob.animation_data and ob.animation_data.action:
+            for fc in iter_fcurves(ob.animation_data.action):
+                for kp in fc.keyframe_points:
+                    kp.interpolation = "LINEAR"
 
 
 # ----------------------------------------------------------------------------
@@ -1788,6 +2035,8 @@ def main():
     build_city(fonts)
     build_gate_sign(fonts)
     build_traffic(scene)
+    build_pedestrians(scene)
+    build_blimps()
     root, props, light = build_drone()
     P, Q, V, roll = compute_drone(tau)
     animate_drone(root, props, light, P, Q, tau)

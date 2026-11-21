@@ -34,8 +34,8 @@ ffmpeg -y -loglevel error -stats -framerate 24 -start_number 0 -i "$FRAMES/nr_%0
 
 # 2) end title card
 ffmpeg -y -loglevel error -f lavfi -i "color=c=black:s=1920x1080:r=24:d=$CARD_DUR" \
-  -vf "drawtext=fontfile=$FONT_B:text='NEON RUSH':fontsize=150:fontcolor=0xff1f7a:x=(w-tw)/2:y=(h-th)/2-30:alpha='min(1,t/0.6)',
-       drawtext=fontfile=$FONT_L:text='UNA ANIMACIÓN PROCEDURAL EN BLENDER 5.3':fontsize=26:fontcolor=0x5fe6ff:x=(w-tw)/2:y=(h/2)+90:alpha='min(1,max(0,(t-0.7)/0.8))',
+  -vf "drawtext=fontfile=$FONT_B:text='AISTUDIO3D':fontsize=150:fontcolor=0xff1f7a:x=(w-tw)/2:y=(h-th)/2-30:alpha='min(1,t/0.6)',
+       drawtext=fontfile=$FONT_L:text='NEON RUSH  ·  ANIMACIÓN PROCEDURAL EN BLENDER 5.3':fontsize=26:fontcolor=0x5fe6ff:x=(w-tw)/2:y=(h/2)+90:alpha='min(1,max(0,(t-0.7)/0.8))',
        gblur=sigma=0:steps=1,
        noise=alls=6:allf=t,
        fade=t=out:st=$(echo "$CARD_DUR-0.8" | bc):d=0.8,format=yuv420p" \
