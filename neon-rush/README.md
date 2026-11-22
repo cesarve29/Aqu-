@@ -23,6 +23,8 @@ tipos de edificio (escalonados, podio + torre, torres gemelas con puente, corona
 
 Después vienen 3.5 s de tarjeta de título AISTUDIO3D (ffmpeg).
 
+**Video final:** [`neon_rush_AISTUDIO3D_1080p.mp4`](neon_rush_AISTUDIO3D_1080p.mp4) (65.5 s, 1920×1080, H.264 + AAC).
+
 ## Archivos
 
 - `build_scene.py` — genera toda la escena y guarda `neon_rush.blend` (ciudad, dron, tráfico, lluvia con Geometry Nodes, letreros, cámaras, compositor con niebla, bloom y aberración cromática).
