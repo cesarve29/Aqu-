@@ -36,11 +36,11 @@ E = dict(
     shield_fade_start=1185, shield_fade_end=1275,
     wiz_recover=1150,
     eyes_flare=1330,
-    fade_start=1404,
+    fade_start=1414,
 )
 
 LAUNCH_POS = np.array([-0.10, 6.05, 1.70])
-IMPACT_POS = np.array([0.02, -5.72, 1.42])   # on the shield surface (before push)
+IMPACT_POS = np.array([0.02, -6.04, 1.42])   # on the shield surface (before push)
 
 
 def clamp(x, a=0.0, b=1.0):
@@ -120,8 +120,8 @@ def orb_radius(f):
 def _wiz_hold(f):
     """Orb position while held by the wizard (world)."""
     chest = WIZ + np.array([0.0, -0.58, 1.38])
-    over = WIZ + np.array([0.0, -0.22, 2.62])
-    back = WIZ + np.array([-0.62, 0.18, 2.05])
+    over = WIZ + np.array([0.0, -0.36, 2.28])
+    back = WIZ + np.array([-0.40, 0.08, 1.95])
     k = ramp(f, E['lift_start'], E['lift_end'], smoother)
     p = chest + (over - chest) * k
     # slow hover drift
@@ -188,7 +188,7 @@ def shield_form(f):
 
 def shield_center(f):
     """Center of the shield cap (world)."""
-    return DEF + np.array([0.0, 1.30 - shield_push(f), 1.42])
+    return DEF + np.array([0.0, 0.98 - shield_push(f), 1.42])
 
 
 def frame_seconds(f):

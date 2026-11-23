@@ -33,6 +33,8 @@ if a.spp:
         sc.cycles.samples = a.spp
     else:
         sc.eevee.taa_render_samples = a.spp
+if a.no_denoise:
+    sc.cycles.use_denoising = False
 if a.no_mblur:
     sc.render.use_motion_blur = False
 if a.no_comp:

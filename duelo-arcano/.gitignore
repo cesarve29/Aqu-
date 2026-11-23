@@ -2,5 +2,6 @@ frames/
 preview/
 *.blend1
 __pycache__/
-audio/raw/*.json
 duelo.blend
+render.log
+audio/list*.tsv
