@@ -5,3 +5,5 @@ __pycache__/
 duelo.blend
 render.log
 audio/list*.tsv
+audio/*.wav
+audio/mix_envelope.png
