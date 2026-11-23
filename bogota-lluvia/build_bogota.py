@@ -231,7 +231,7 @@ def building_material():
     is_brick = b.math("COMPARE", btype, 0.0, 0.1)
     is_plas = b.math("COMPARE", btype, 3.0, 0.1)
     fh = b.math("ADD", 3.1, b.math("MULTIPLY", is_glass, 0.7))          # floor height
-    ww = b.math("ADD", 2.4, b.math("MULTIPLY", bid, 0.9))               # window pitch
+    ww = b.math("ADD", 1.9, b.math("MULTIPLY", bid, 0.7))               # window pitch
     fy = b.math("DIVIDE", v, fh)
     fx = b.math("DIVIDE", u, ww)
     floor_i = b.math("FLOOR", fy)
@@ -246,6 +246,11 @@ def building_material():
     above = b.math("GREATER_THAN", floor_i, 0.5)
     below_top = b.math("LESS_THAN", v, b.math("SUBTRACT", bh, 1.2))
     win = b.math("MULTIPLY", b.math("MULTIPLY", win_x, win_y), b.math("MULTIPLY", above, below_top))
+    # mullions: a vertical bar in the middle and a transom near the top of each window (not on curtain walls)
+    mull_v = b.math("LESS_THAN", b.math("ABSOLUTE", b.math("SUBTRACT", rx, 0.5)), 0.022)
+    mull_h = b.math("LESS_THAN", b.math("ABSOLUTE", b.math("SUBTRACT", ry, 0.7)), 0.02)
+    mull = b.math("MULTIPLY", b.math("MAXIMUM", mull_v, mull_h), b.math("SUBTRACT", 1.0, is_glass))
+    win = b.math("MULTIPLY", win, b.math("SUBTRACT", 1.0, mull))
     # ground floor: shop fronts
     shop = b.math("MULTIPLY", b.math("LESS_THAN", floor_i, 0.5),
                   b.math("MULTIPLY", b.math("GREATER_THAN", v, 0.4), b.math("LESS_THAN", v, 2.9)))
@@ -263,7 +268,8 @@ def building_material():
     wcol = b.mix(b.math("GREATER_THAN", rsep.outputs[1], 0.97), wcol, (0.35, 0.5, 1.0))
     # curtains / interior variation inside a window
     inner = b.noise(b.comb(u, v, b.math("MULTIPLY", bid, 50.0)), 1.6, detail=1.0)
-    ivar = b.math("ADD", 0.45, b.math("MULTIPLY", inner.outputs["Fac"], 1.1))
+    ivar = b.math("ADD", 0.3, b.math("MULTIPLY", inner.outputs["Fac"], 0.9))
+    ivar = b.math("MULTIPLY", ivar, b.math("ADD", 0.55, b.math("MULTIPLY", b.math("SINE", b.math("MULTIPLY", rx, math.pi)), 0.6)))
     wstr = b.math("MULTIPLY", b.math("MULTIPLY", lit, ivar), b.math("ADD", 0.1, b.math("MULTIPLY", b.math("POWER", rsep.outputs[2], 2.0), 0.5)))
     emit_w = b.math("MULTIPLY", win, wstr)
     # shops: colourful strips
