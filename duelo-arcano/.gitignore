@@ -7,3 +7,4 @@ render.log
 audio/list*.tsv
 audio/*.wav
 audio/mix_envelope.png
+render_segments/list.txt
