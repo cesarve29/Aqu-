@@ -570,7 +570,7 @@ MODES.eq = {
   cam(t, u, p) {
     const fin = p.pal === 1;
     const seg = Math.floor(u / (BAR * 4)), w = u - seg * BAR * 4;
-    const pre = fin ? [0, 4, 2, 0, 3, 4, 1, 0][seg % 8] : [0, 1, 2, 3][seg % 4];
+    const pre = fin ? [0, 4, 2, 0, 3, 4, 1, 0][((seg % 8) + 8) % 8] : [0, 1, 2, 3][((seg % 4) + 4) % 4];
     const pl = pulse(t);
     let r;
     switch (pre) {
@@ -733,7 +733,7 @@ MODES.galaxy = {
   },
   cam(t, u) {
     const seg = Math.floor(u / (BAR * 4)), w = u - seg * BAR * 4;
-    const pre = [0, 1, 2, 0, 3, 1, 2, 0][seg % 8];
+    const pre = [0, 1, 2, 0, 3, 1, 2, 0][((seg % 8) + 8) % 8];
     let r;
     switch (pre) {
       case 0: { const a = 0.4 + u * 0.12; r = { pos: [Math.sin(a) * 120, 50, Math.cos(a) * 120], look: [0, 14, 0], fov: 52 }; break; }
@@ -1151,7 +1151,7 @@ async function setup() {
   finalPass = new ShaderPass({
     uniforms: { tDiffuse: { value: null }, tLyA: { value: LYT[0] }, tLyB: { value: LYT[1] }, uA: { value: new THREE.Vector4() }, uB: { value: new THREE.Vector4() },
       uC1: { value: new THREE.Vector3() }, uC2: { value: new THREE.Vector3() }, uC3: { value: new THREE.Vector3() }, uRes: { value: new THREE.Vector2(W, H) },
-      uTime: { value: 0 }, uCA: { value: 0 }, uGrain: { value: 0.03 }, uFade: { value: 0 }, uFlash: { value: 0 }, uSweep: { value: 0 } },
+      uTime: { value: 0 }, uCA: { value: 0 }, uGrain: { value: 0.012 }, uFade: { value: 0 }, uFlash: { value: 0 }, uSweep: { value: 0 } },
     vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
     fragmentShader: FINAL_FS,
   });

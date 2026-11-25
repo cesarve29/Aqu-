@@ -9,7 +9,7 @@ mkdir -p segs
 pids=()
 for ((w=0; w<WORKERS; w++)); do
   s=$((w*CHUNK)); e=$(( (w+1)*CHUNK ))
-  node render.js --start $s --end $e --out segs/seg$w.mp4 > segs/log$w.txt 2>&1 &
+  node render.js --crf ${CRF:-16} --start $s --end $e --out segs/seg$w.mp4 > segs/log$w.txt 2>&1 &
   pids+=($!)
 done
 for p in "${pids[@]}"; do wait $p; done
