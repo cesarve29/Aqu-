@@ -11,7 +11,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 const params = new URLSearchParams(location.search);
 const W = +(params.get('w') || 1920), H = +(params.get('h') || 1080);
 const FPS = 30;
-const N = 7600;                 // voxel instances
+const N = 8800;                 // voxel instances
 const INTRO = 6.0;              // seconds of title intro before the song
 const BEAT = 60 / 131;          // 131 BPM
 const BAR = BEAT * 4;
@@ -80,16 +80,17 @@ const pulse = t => Math.exp(-sinceBeat(t) * 7) * clamp(bass(lastBeat(t) + 0.04) 
 const I = INTRO;
 const SEC = [
   { t: 0, m: 'title' },
-  { t: I + 0.0, m: 'city', p: { v: 0 }, lift: 26 },
+  { t: I + 0.0, m: 'ocean', lift: 26 },
+  { t: I + 15.76, m: 'forest', lift: 14 },
   { t: I + 30.41, m: 'terrain', lift: 18 },
-  { t: I + 45.07, m: 'orb', p: { calm: 0 }, lift: 20 },
+  { t: I + 45.07, m: 'clouds', lift: 16 },
   { t: I + 52.40, m: 'eq', p: { pal: 0 }, flash: 1, cut: true, lift: 30 },
   { t: I + 79.88, m: 'orb', p: { calm: 1 }, lift: 14 },
   { t: I + 85.37, m: 'planet', flash: 0.5, lift: 16 },
-  { t: I + 99.99, m: 'city', p: { v: 1 }, flash: 0.6, lift: 20 },
+  { t: I + 99.99, m: 'moon', flash: 0.6, lift: 20 },
   { t: I + 114.65, m: 'tunnel', flash: 1, cut: true, lift: 10 },
   { t: I + 129.34, m: 'orb', p: { calm: 0 }, lift: 20 },
-  { t: I + 136.67, m: 'eq', p: { pal: 1 }, flash: 1, cut: true, lift: 30 },
+  { t: I + 136.67, m: 'galaxy', flash: 1, cut: true, lift: 30 },
   { t: I + 164.15, m: 'outro', lift: 12 },
 ];
 let END = 0;
@@ -203,7 +204,7 @@ MODES.title = {
     return { pos: [Math.sin(u * 0.35) * 8, lerp(14, 22, smooth(0, 6, u)), lerp(225, 190, easeOut(clamp(u / 6)))],
              look: [0, 19, 0], fov: 40, roll: 0 };
   },
-  env() { return { fog: [0.03, 0.01, 0.06], fogD: 0.0032, top: [0.0, 0.0, 0.02], hor: [0.10, 0.02, 0.16], stars: 1, aurora: 0, sun: 0, ground: 1, gridCol: [0.6, 0.1, 0.9], cell: 4, seam: 0.5, lit: 0, exposure: 1.0, bloom: [0.6, 0.4, 0.85] }; },
+  env() { return { fog: [0.03, 0.01, 0.06], fogD: 0.0032, top: [0.0, 0.0, 0.02], hor: [0.10, 0.02, 0.16], stars: 1.3, aurora: 0.5, sun: 0, ground: 0, gridCol: [0.6, 0.1, 0.9], cell: 4, seam: 0.5, lit: 0, exposure: 1.0, bloom: [0.6, 0.4, 0.85] }; },
 };
 MODES.outro = {
   fill(t, u, p, o) { titleFill(o, u, 'outro'); },
@@ -211,65 +212,181 @@ MODES.outro = {
   env: MODES.title.env,
 };
 
-// ---- city
-const CC = 6, CNX = 25, CNZ = 48;
-const CITY_BASE = [[0.06, 0.07, 0.14], [0.10, 0.06, 0.16], [0.05, 0.10, 0.13], [0.12, 0.12, 0.17]];
-const NEON = [[1.0, 0.1, 0.6], [0.1, 0.8, 1.0], [1.0, 0.5, 0.1], [0.6, 0.3, 1.0]];
-function cityZ(u, v) { return v ? -2400 - 21 * u : -12 * u; }
-function cityLit(u, v) { return v ? 1 : 0.04 + 0.96 * smooth(3, 28, u); }
-MODES.city = {
+// ---- shared helpers for flying over a voxel heightfield
+const GN = 72, GC = 2;
+function gridFly(o, i0, zc, fn) {
+  const base = Math.floor(-zc / GC) - 4;
+  let i = i0;
+  for (let iz = 0; iz < GN; iz++) {
+    const k = ringCell(iz, GN, base), z = -k * GC;
+    for (let ix = 0; ix < GN; ix++, i++) fn(i, (ix - GN / 2 + 0.5) * GC, z, ix, k);
+  }
+  return i;
+}
+// world-anchored floating particles around a camera moving along -z
+function floaters(o, i, count, zc, u, t, spanX, yMin, yMax, rise, sz, col, emis, seed, ground) {
+  const S = 170, dist = -zc;
+  for (let j = 0; j < count && i < N; j++, i++) {
+    const a = h1(j * 1.37 + seed), b = h1(j * 2.11 + seed * 2), c = h1(j * 3.77 + seed * 3);
+    const D = a * S + S * Math.ceil((dist + 6 - a * S) / S);
+    const x = (b - 0.5) * spanX + Math.sin(t * 0.7 + j) * 0.8;
+    const g = ground ? Math.max(yMin, ground(x, -D)) : yMin;
+    const span = yMax - yMin;
+    const y = g + (c * span + u * rise * (0.5 + b)) % span;
+    const s = sz * smooth(g, g + 2, y) * smooth(g + span, g + span - 3, y);
+    const fl = emis * (0.6 + 0.4 * Math.sin(t * 5 + j * 1.7));
+    put(o, i, x, y, -D, s, s, s, col(j), col(j), fl, 0, 0, a);
+  }
+  return i;
+}
+
+// ---- ocean at night (verse 1a: "sparks in motion, waves in the ocean")
+const oceanZ = u => -20000 - 9 * u;
+function oceanH(x, z, t) {
+  return 2 + 1.6 * Math.sin(x * 0.12 + t * 1.3) + 1.2 * Math.sin(z * 0.09 - t * 1.7 + x * 0.05) + 0.8 * Math.sin((x + z) * 0.21 + t * 2.1);
+}
+MODES.ocean = {
   fill(t, u, p, o) {
-    const v = p.v, zc = cityZ(u, v), lit = cityLit(u, v);
-    const camCell = Math.floor(-zc / CC), pl = pulse(t);
-    let i = 0;
-    for (let iz = 0; iz < CNZ; iz++) {
-      const k = ringCell(iz, CNZ, camCell - 3);
-      for (let ix = 0; ix < CNX; ix++, i++) {
-        const cx = ix - (CNX >> 1);
-        const vo = v * 91.7;
-        const a = h2(cx * 3.1 + vo, k * 1.7), b = h2(cx * 5.3 + vo, k * 2.9 + 1), c = h2(cx * 7.7 + vo, k * 4.1 + 2);
-        const d = h2(cx * 1.9 + vo, k * 6.3 + 3), e = h2(cx * 9.1 + vo, k * 0.7 + 4), f = h2(cx * 2.3 + vo, k * 8.9 + 5);
-        const zx = -k * CC;
-        if (cx === 0 || a < 0.1) { hide(o, i, cx * CC, 0, zx); continue; }
-        const w = 2 + Math.floor(b * 4), dd = 2 + Math.floor(c * 4);
-        const district = fbm(k * 0.045 + vo, cx * 0.09);
-        let Hh = 2 + Math.floor(Math.pow(d, 1.7) * (10 + 34 * district));
-        if (Math.abs(cx) === 1) Hh = Math.min(Hh, 6 + Math.floor(d * 22));
-        Hh += Math.round(pl * (e > 0.6 ? 1 : 0) * 3 * lit);
-        const x = cx * CC + (e - 0.5) * (CC - w - 1), z = zx + (f - 0.5) * (CC - dd - 1);
-        const nn = NEON[Math.floor(f * 4) % 4];
-        const accI = 0.12 + 0.88 * lit * (0.6 + 0.4 * Math.sin(t * 2 + k));
-        put(o, i, x, Hh / 2, z, w, Hh, dd, CITY_BASE[Math.floor(e * 4) % 4], [nn[0] * accI, nn[1] * accI, nn[2] * accI],
-            0, 1, d > 0.8 ? 0.6 * lit : 0, a);
+    const en = energy(t), pl = pulse(t);
+    let i = gridFly(o, 0, oceanZ(u), (i, x, z) => {
+      const band = Math.min(31, Math.floor(Math.abs(x) / (GN * GC / 2) * 28));
+      let h = Math.max(0, Math.round(oceanH(x, z, t) + spec(band, t) * 2.5 * en));
+      const glit = Math.exp(-x * x / 50) * (h1(Math.floor(x) * 3.1 + Math.floor(z) * 7.7 + Math.floor(t * 6)) > 0.6 ? 1 : 0);
+      const bio = h2(x * 0.7, z * 0.3) > 0.93 ? pl * 1.5 : 0;
+      put(o, i, x, (h - 6) / 2, z, GC, h + 6, GC, [0.015, 0.05, 0.15], [0.05, 0.3, 0.75], 0.02 + 0.6 * glit + bio, 0, h >= 6 ? 0.3 : 0, h2(x, z));
+    });
+    i = floaters(o, i, 900, oceanZ(u), u, t, 110, 3, 26, 1.2, 0.25, j => (j % 3 ? [0.3, 0.8, 1.0] : [1.0, 0.7, 0.4]), 2.2, 3, null);
+    hideFrom(o, i);
+  },
+  cam(t, u) {
+    const zc = oceanZ(u), y = 8 + Math.sin(u * 0.4) * 1.2;
+    return { pos: [Math.sin(u * 0.15) * 3, y, zc], look: [0, 6, zc - 60], fov: 58, roll: Math.sin(u * 0.5) * 0.04 };
+  },
+  env() { return { fog: [0.03, 0.05, 0.12], fogD: 0.0058, top: [0.0, 0.0, 0.03], hor: [0.05, 0.09, 0.2], stars: 1.3, aurora: 0.3, sun: 0.42, sunCol: [0.75, 0.85, 1.0], stripes: 0, ground: 0, seam: 0.22, exposure: 1.0, bloom: [0.55, 0.45, 0.85] }; },
+};
+
+// ---- glowing forest (verse 1b: "hands up high ... neon lights")
+const forestZ = u => -30000 - 10 * u;
+function forestG(x, z) { return Math.floor(fbm(x * 0.03 + 3, z * 0.03) * 7 * smooth(4, 20, Math.abs(x))) + 1; }
+const LEAF = [[1.0, 0.2, 0.7], [0.2, 1.0, 0.6], [0.3, 0.7, 1.0], [0.8, 0.4, 1.0]];
+MODES.forest = {
+  fill(t, u, p, o) {
+    const zc = forestZ(u), lit = smooth(0, 11, u), pl = pulse(t);
+    let i = gridFly(o, 0, zc, (i, x, z) => {
+      const h = forestG(x, z);
+      const fl = h2(x * 1.3, z * 0.7);
+      const flower = fl > 0.94;
+      const fc = LEAF[Math.floor(fl * 97) % 4];
+      put(o, i, x, (h - 6) / 2, z, GC, h + 6, GC, flower ? [0.3, 0.1, 0.3] : [0.04, 0.16, 0.07], flower ? fc : [0.15, 0.7, 0.3],
+          flower ? (0.3 + 1.6 * lit) * (0.7 + 0.6 * pl) : 0, 0, flower ? 0.8 : 0, fl);
+    });
+    // trees: trunk + two canopy blocks per cell
+    const TCs = 8, NXt = 15, NZt = 22, base = Math.floor(-zc / TCs) - 2;
+    for (let iz = 0; iz < NZt; iz++) {
+      const k = ringCell(iz, NZt, base);
+      for (let ix = 0; ix < NXt; ix++) {
+        const cx = ix - (NXt >> 1);
+        const a = h2(cx * 3.3, k * 1.9), b = h2(cx * 1.7, k * 4.3), c = h2(cx * 6.1, k * 2.2);
+        const x = cx * TCs + (b - 0.5) * 4, z = -k * TCs + (c - 0.5) * 4;
+        if (Math.abs(cx) < 1 || a < 0.3) { hide(o, i++, x, 0, z); hide(o, i++, x, 0, z); hide(o, i++, x, 0, z); continue; }
+        const g = forestG(x, z), th = 4 + Math.floor(b * 7), cw = 4 + Math.floor(c * 3);
+        const lc = LEAF[Math.floor(a * 40) % 4];
+        const glow = 0.15 + 0.85 * lit;
+        const sway = Math.sin(t * 1.5 + k) * 0.3;
+        put(o, i++, x, g + th / 2, z, 1, th, 1, [0.18, 0.1, 0.06], [0.4, 0.2, 0.1], 0, 0, 0, a);
+        put(o, i++, x + sway * 0.5, g + th + cw / 2 - 0.5, z, cw, cw, cw, [0.03, 0.18, 0.12], [lc[0] * glow, lc[1] * glow, lc[2] * glow], 0.05 * lit, 0, 0.3 * lit, b);
+        put(o, i++, x + sway, g + th + cw + 0.5, z, cw - 2, 2, cw - 2, [0.04, 0.22, 0.14], [lc[0] * glow, lc[1] * glow, lc[2] * glow], 0.1 * lit + pl * 0.3 * lit, 0, 0.5 * lit, c);
       }
     }
-    // embers
-    const ne = Math.floor(1300 * (0.15 + 0.85 * lit)), dist = -zc, S = 220;
-    for (let j = 0; j < 1300 && i < N; j++, i++) {
-      const a = h1(j * 1.73 + 11), b = h1(j * 2.91 + 13), c = h1(j * 4.37 + 17);
-      const D = a * S + S * Math.ceil((dist + 4 - a * S) / S);
-      const x = (b - 0.5) * 70, y = (c * 40 + u * (0.6 + b) * 1.6) % 40 + 0.5;
-      const s = j < ne ? 0.22 * smooth(0, 3, y) * smooth(40, 34, y) : 0;
-      const col = b > 0.5 ? [1.0, 0.55, 0.2] : [0.3, 0.8, 1.0];
-      put(o, i, x, y, -D, s, s, s, col, col, 3 + 2 * Math.sin(t * 5 + j), 0, 0, c);
+    const nf = Math.floor(lerp(400, 1500, lit));
+    i = floaters(o, i, nf, zc, u, t, 120, 1, 22, 1.0, 0.22, () => [0.8, 1.0, 0.3], 3.0, 5, forestG);
+    hideFrom(o, i);
+  },
+  cam(t, u, p, sec) {
+    const zc = forestZ(u), up = easeIO(smooth(sec.dur - 4, sec.dur, u));
+    const y = lerp(7, 24, up) + Math.sin(u * 0.5) * 0.8;
+    return { pos: [Math.sin(u * 0.2) * 2, y, zc], look: [0, lerp(5, 22, up), zc - 50], fov: 62, roll: Math.sin(u * 0.4) * 0.04 };
+  },
+  env(t, u) {
+    const lit = smooth(0, 11, u);
+    return { fog: [0.02, 0.05, 0.07], fogD: 0.0072, top: [0.0, 0.01, 0.04], hor: [0.04, 0.12, 0.15], stars: 1.0, aurora: 0.3 + 0.5 * lit, sun: 0, ground: 0, seam: 0.3, exposure: 1.0, bloom: [0.6, 0.45, 0.82] };
+  },
+};
+
+// ---- clouds (build 1: rising through the sky)
+const CLN = 44, CLS = 7;
+function cloudLayer(o, i, t, u, y0, layers, drift, tint) {
+  for (let iz = 0; iz < CLN; iz++) for (let ix = 0; ix < CLN; ix++) for (let L = 0; L < layers && i < N; L++, i++) {
+    const x = (ix - CLN / 2 + 0.5) * CLS, z = (iz - CLN / 2 + 0.5) * CLS;
+    const n = fbm3(x * 0.018 + 4, L * 0.6 + 1, z * 0.018 + u * drift);
+    if (n < 0.5) { hide(o, i, x, y0 + L * 6, z); continue; }
+    const th = 3 + Math.round((n - 0.5) * 22);
+    const c = mixc([0.95, 0.85, 0.95], tint, 0.25 + 0.15 * L);
+    const yy = y0 + L * 9 + (h2(ix * 1.3, iz * 0.7 + L) - 0.5) * 8 + (n - 0.5) * 10;
+    put(o, i, x, yy, z, CLS, th, CLS, c, tint, 0.2 + 0.1 * L, 0, 0.2, n);
+  }
+  return i;
+}
+MODES.clouds = {
+  fill(t, u, p, o) {
+    let i = cloudLayer(o, 0, t, u, 70, 3, 0.08, [1.0, 0.55, 0.45]);
+    i = floaters(o, i, 600, 0, u, t, 200, 20, 140, 6, 0.3, () => [1.0, 0.6, 0.3], 2.5, 9, null);
+    hideFrom(o, i);
+  },
+  cam(t, u, p, sec) {
+    const q = easeIO(clamp(u / sec.dur));
+    const a = 0.3 + u * 0.08, y = lerp(52, 128, q);
+    return { pos: [Math.sin(a) * 20, y, Math.cos(a) * 20], look: [Math.sin(a + 0.9) * 80, y + lerp(6, 28, q), Math.cos(a + 0.9) * 80], fov: 64, roll: 0 };
+  },
+  env(t, u, p, sec) {
+    const q = clamp(u / sec.dur);
+    return { fog: mixc([0.45, 0.25, 0.35], [0.1, 0.05, 0.2], q), fogD: 0.0018, top: mixc([0.05, 0.05, 0.2], [0.0, 0.0, 0.04], q), hor: mixc([0.55, 0.22, 0.3], [0.25, 0.08, 0.25], q),
+             stars: q, aurora: 0, sun: 1, ground: 0, seam: 0.1, exposure: 1.0, bloom: [0.55, 0.45, 0.85] };
+  },
+};
+
+// ---- moon surface (pre-chorus 2)
+const moonZ = u => -40000 - 15 * u;
+function moonH(x, z) {
+  let h = fbm(x * 0.02 + 9, z * 0.02) * 9 - 2;
+  const C = 34, cx = Math.floor(x / C), cz = Math.floor(z / C);
+  for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+    const gx = cx + dx, gz = cz + dz;
+    const px = (gx + h2(gx, gz)) * C, pz = (gz + h2(gz * 1.3, gx * 0.7)) * C;
+    const r = 5 + h2(gx * 2.1, gz * 3.7) * 11, d = Math.hypot(x - px, z - pz);
+    if (d < r) h -= (1 - (d / r) * (d / r)) * r * 0.45;
+    else if (d < r * 1.35) h += (1 - (d - r) / (0.35 * r)) * 2.2;
+  }
+  return Math.floor(h);
+}
+MODES.moon = {
+  fill(t, u, p, o) {
+    const zc = moonZ(u), pl = pulse(t);
+    let i = gridFly(o, 0, zc, (i, x, z) => {
+      const h = moonH(x, z);
+      const g = 0.3 + 0.12 * h2(x, z);
+      const low = h < -2;
+      const band = Math.min(31, Math.floor(Math.abs(x) / 72 * 30));
+      const em = low ? (0.1 + spec(band, t) * 1.2) * (0.6 + pl) : 0;
+      put(o, i, x, (h - 8) / 2, z, GC, h + 8, GC, [g, g, g * 1.1], low ? [0.2, 0.7, 1.0] : [0.5, 0.55, 0.8], em, 0, 0, h2(z, x));
+    });
+    // floating rocks
+    const S = 170, dist = -zc;
+    for (let j = 0; j < 700 && i < N; j++, i++) {
+      const a = h1(j * 1.9 + 81), b = h1(j * 2.7 + 83), c = h1(j * 3.3 + 87);
+      const D = a * S + S * Math.ceil((dist + 6 - a * S) / S);
+      const s = 0.4 + c * c * 2.2;
+      const y = 10 + b * 40 + Math.sin(t * 0.5 + j) * 1.5;
+      put(o, i, (b - 0.5) * 140, y, -D, s, s, s, [0.35, 0.33, 0.38], [0.5, 0.6, 1.0], 0.02, 0, 0, a);
     }
     hideFrom(o, i);
   },
-  cam(t, u, p) {
-    const v = p.v, zc = cityZ(u, v);
-    if (!v) {
-      const rise = easeIO(smooth(14, 28.5, u));
-      const y = lerp(3.4, 34, rise), x = Math.sin(u * 0.25) * 1.2;
-      return { pos: [x, y, zc], look: [x * 0.4, lerp(4.5, 10, rise), zc - lerp(40, 70, rise)], fov: lerp(64, 56, rise), roll: Math.sin(u * 0.4) * 0.03 };
-    }
-    const y = 20 + Math.sin(u * 0.35) * 6 + 14 * smooth(10, 14.6, u);
-    return { pos: [Math.sin(u * 0.2) * 3, y, zc], look: [0, y - 12, zc - 60], fov: 60, roll: Math.sin(u * 0.5) * 0.06 };
+  cam(t, u, p, sec) {
+    const zc = moonZ(u), up = easeIO(smooth(sec.dur - 3.5, sec.dur, u));
+    const y = 16 + Math.sin(u * 0.3) * 3 + up * 10;
+    return { pos: [Math.sin(u * 0.18) * 6, y, zc], look: [0, y - 8 + up * 12, zc - 60], fov: 60, roll: Math.sin(u * 0.4) * 0.06 };
   },
-  env(t, u, p) {
-    const lit = cityLit(u, p.v);
-    return { fog: [0.015, 0.012, 0.05], fogD: 0.0082, top: [0.0, 0.0, 0.025], hor: [0.05 + 0.06 * lit, 0.03, 0.13 + 0.05 * lit], stars: 1, aurora: 0.2 * lit, sun: 0, ground: 1,
-             gridCol: [0.1 + 0.5 * lit, 0.2, 0.5 + 0.4 * lit], cell: CC, seam: 0.65, lit, exposure: 1.0, bloom: [0.55, 0.45, 0.85] };
-  },
+  env() { return { fog: [0.0, 0.0, 0.02], fogD: 0.005, top: [0, 0, 0.01], hor: [0.02, 0.02, 0.06], stars: 1.6, aurora: 0.2, sun: 0.5, sunCol: [0.25, 0.55, 1.0], stripes: 0, ground: 0, seam: 0.3, exposure: 1.05, bloom: [0.55, 0.45, 0.85] }; },
 };
 
 // ---- terrain (chorus 1)
@@ -421,6 +538,18 @@ MODES.eq = {
         put(o, i, lx * ca + lz * sa, ly, -lx * sa + lz * ca, sc, sc, sc, mixc(c0, [0, 0, 0], 0.4), c0, em, 0, 0, h1(k));
       }
     }
+    if (!fin) {
+      // sea of clouds around the equalizer
+      for (let j = 0; j < 1300 && i < N; j++, i++) {
+        const a = h1(j * 1.7 + 91), b = h1(j * 2.3 + 93);
+        const r = 42 + Math.sqrt(a) * 150, th = b * TAU + u * 0.01;
+        const x = Math.cos(th) * r, z = Math.sin(th) * r;
+        const n = fbm(x * 0.03 + u * 0.05, z * 0.03);
+        if (n < 0.42) { hide(o, i, x, -3, z); continue; }
+        const th2 = 1 + Math.round((n - 0.42) * 10);
+        put(o, i, x, -3 + th2 / 2, z, 7, th2, 7, [0.7, 0.55, 0.8], [1.0, 0.4, 0.7], 0.03, 0, 0.1, n);
+      }
+    }
     // sparks launched on beats
     const nsp = N - i;
     for (let j = 0; j < nsp; j++, i++) {
@@ -456,7 +585,7 @@ MODES.eq = {
   },
   env(t, u, p) {
     const fin = p.pal === 1;
-    return { fog: fin ? [0.02, 0.0, 0.05] : [0.04, 0.0, 0.06], fogD: 0.0042, top: [0.0, 0.0, 0.02], hor: fin ? [0.06, 0.02, 0.14] : [0.12, 0.01, 0.12], stars: 1, aurora: fin ? 0.5 : 0, sun: 0, ground: 1,
+    return { fog: [0.12, 0.04, 0.16], fogD: 0.0042, top: [0.0, 0.0, 0.03], hor: [0.3, 0.08, 0.28], stars: 1.2, aurora: 0.8, sun: 0, ground: 0,
              gridCol: fin ? [0.3, 0.6, 1.0] : [1.0, 0.2, 0.6], cell: ES, seam: 0.55, lit: 0, exposure: 1.0, bloom: [0.6, 0.45, 0.85] };
   },
 };
@@ -562,6 +691,62 @@ MODES.tunnel = {
   env() { return { fog: [0.0, 0.0, 0.02], fogD: 0.0105, top: [0, 0, 0.02], hor: [0.02, 0.0, 0.05], stars: 0.5, aurora: 0, sun: 0, ground: 0, gridCol: [0, 0, 0], cell: 4, seam: 0.6, lit: 0, exposure: 1.0, bloom: [0.65, 0.5, 0.8] }; },
 };
 
+// ---- spiral galaxy (final drop): every star-voxel is an equalizer bar
+const GALAXY_N = 3900;
+MODES.galaxy = {
+  fill(t, u, p, o, sec) {
+    let i = 0;
+    const rot = u * 0.07, pl = pulse(t);
+    for (let j = 0; j < GALAXY_N; j++, i++) {
+      const a = h1(j * 1.13 + 3), b = h1(j * 2.71 + 5), c = h1(j * 3.97 + 7), d = h1(j * 5.31 + 11);
+      const arm = j % 3;
+      const r = 5 + Math.pow(a, 0.75) * 78;
+      const spread = (b - 0.5) * (0.9 - 0.5 * r / 83);
+      const ang = arm * TAU / 3 + Math.log(r) * 2.3 + spread + rot;
+      const x = Math.cos(ang) * r, z = Math.sin(ang) * r;
+      const band = Math.min(31, Math.floor(r / 83 * 31));
+      const v = spec(band, t);
+      const hgt = Math.max(1, Math.round(1 + v * 9 * (1.1 - r / 100) + (c > 0.9 ? 2 : 0)));
+      const y0 = (d - 0.5) * 3 * (1 - r / 90);
+      let col = hsv(0.55 + r / 83 * 0.5 + t * 0.04 + arm * 0.05, 0.8 - 0.5 * smooth(18, 0, r), 1);
+      const em = 0.15 + (r < 14 ? 1.2 : 0) + pl * 0.4 * (c > 0.7 ? 1 : 0);
+      put(o, i, x, y0 + hgt / 2, z, 1.1, hgt, 1.1, [col[0] * 0.3, col[1] * 0.3, col[2] * 0.3], col, em, 0, 0.7, a);
+    }
+    // bright core
+    const cs = 0.55 + 0.05 * pl;
+    for (let k = 0; k < ORB.length && i < N; k++, i++) {
+      const [px, py, pz] = ORB[k];
+      put(o, i, px * cs, py * cs * 0.6, pz * cs, cs, cs, cs, [1, 0.85, 0.6], [1, 0.8, 0.5], 1.0 + pl, 0, 0, h1(k));
+    }
+    // floating title facing the camera
+    const cam = this.cam(t, u, p, sec);
+    const ang = Math.atan2(cam.pos[0], cam.pos[2]), ca = Math.cos(ang), sa = Math.sin(ang);
+    const bob = Math.sin(u * 0.8) * 1.5;
+    for (let k = 0; k < TITLE.length && i < N; k++, i++) {
+      const v = TITLE[k];
+      const c0 = v.grp ? ECHO_COL : grad(TITLE_COLS, v.nx);
+      const sc = 0.5, lx = v.x * sc, ly = v.y * sc + 38 + bob, lz = v.z * sc;
+      const em = 0.6 + 1.0 * pl + 2.5 * Math.exp(-Math.pow((v.x - lerp(-120, 120, fract(u / (BAR * 2)))) / 10, 2));
+      put(o, i, lx * ca + lz * sa, ly, -lx * sa + lz * ca, sc, sc, sc, mixc(c0, [0, 0, 0], 0.4), c0, em, 0, 0, h1(k));
+    }
+    hideFrom(o, i);
+  },
+  cam(t, u) {
+    const seg = Math.floor(u / (BAR * 4)), w = u - seg * BAR * 4;
+    const pre = [0, 1, 2, 0, 3, 1, 2, 0][seg % 8];
+    let r;
+    switch (pre) {
+      case 0: { const a = 0.4 + u * 0.12; r = { pos: [Math.sin(a) * 120, 50, Math.cos(a) * 120], look: [0, 14, 0], fov: 52 }; break; }
+      case 1: { const a = 1.0 + u * 0.1; r = { pos: [Math.sin(a) * 70, 6, Math.cos(a) * 70], look: [0, 22, 0], fov: 60 }; break; }
+      case 2: { const a = u * 0.2; r = { pos: [Math.sin(a) * 8, 140 - w * 4, Math.cos(a) * 8], look: [0, 0, 0], fov: 60, roll: a }; break; }
+      case 3: { const a = 2.0 - u * 0.25; r = { pos: [Math.sin(a) * 38, 14, Math.cos(a) * 38], look: [0, 4, 0], fov: 62 }; break; }
+    }
+    r.fov -= pulse(t) * 3; r.roll = r.roll || 0;
+    return r;
+  },
+  env() { return { fog: [0.01, 0.0, 0.03], fogD: 0.0018, top: [0.0, 0.0, 0.015], hor: [0.04, 0.01, 0.08], stars: 1.6, aurora: 0.7, sun: 0, ground: 0, seam: 0.5, exposure: 1.0, bloom: [0.6, 0.45, 0.85] }; },
+};
+
 // ------------------------------------------------------------------ three.js setup
 let renderer, scene, camera, composer, bloom, finalPass, voxMat, skyMat, groundMat, ground, sky, geo;
 const ATTR = {};
@@ -626,7 +811,7 @@ void main(){
 
 const SKY_VS = `varying vec3 vDir; void main(){ vDir = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position = p.xyww; }`;
 const SKY_FS = /* glsl */`
-uniform vec3 uTop; uniform vec3 uHor; uniform float uStars; uniform float uAurora; uniform float uSun; uniform float uTime;
+uniform vec3 uTop; uniform vec3 uHor; uniform float uStars; uniform float uAurora; uniform float uSun; uniform float uTime; uniform vec3 uSunCol; uniform float uStripes;
 varying vec3 vDir;
 float h3(vec3 p){ p = fract(p*0.3183099 + 0.1); p *= 17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
 void main(){
@@ -650,8 +835,8 @@ void main(){
     float r = length(pq);
     float disc = 1.0 - smoothstep(0.255, 0.265, r);
     float stripes = step(0.0, sin(pq.y * 140.0 - uTime * 1.5) + (pq.y + 0.25) * 6.0 - 0.6);
-    float cut = pq.y < 0.0 ? stripes : 1.0;
-    vec3 sc = mix(vec3(1.0, 0.1, 0.45), vec3(1.0, 0.85, 0.25), smoothstep(-0.25, 0.25, pq.y));
+    float cut = mix(1.0, pq.y < 0.0 ? stripes : 1.0, uStripes);
+    vec3 sc = mix(uSunCol * (0.75 + 0.25 * smoothstep(-0.25, 0.25, pq.y)), mix(vec3(1.0, 0.1, 0.45), vec3(1.0, 0.85, 0.25), smoothstep(-0.25, 0.25, pq.y)), uStripes);
     col += sc * disc * cut * uSun * 2.2;
     col += sc * exp(-r * 4.0) * 0.4 * uSun;
   }
@@ -794,9 +979,9 @@ function lyricsUniforms(t) {
   for (let n = 0; n < LYR.length; n++) {
     const L = LYR[n], s = L.start + I, e = L.end + I;
     const next = LYR[n + 1];
-    const exitAt = Math.min(e + 0.2, next ? next.start + I - 0.3 : 1e9);
-    if (t < s - 0.4 || t > exitAt + 0.45) continue;
-    const vin = smooth(s - 0.4, s - 0.05, t), vout = 1 - smooth(exitAt, exitAt + 0.4, t);
+    const exitAt = Math.min(e + 0.25, next ? next.start + I - 0.55 : 1e9);
+    if (t < s - 0.3 || t > exitAt + 0.3) continue;
+    const vin = smooth(s - 0.3, s - 0.02, t), vout = 1 - smooth(exitAt, exitAt + 0.28, t);
     const vis = Math.min(vin, vout);
     const slot = n % 2;
     drawLine(slot, L, t);
@@ -808,7 +993,11 @@ function lyricsUniforms(t) {
 }
 function lyricColors(m) {
   switch (m) {
-    case 'city': return [[0.2, 0.85, 1.0], [1.0, 0.25, 0.75], [1.0, 0.9, 0.4]];
+    case 'ocean': return [[0.2, 0.85, 1.0], [0.5, 0.6, 1.0], [1.0, 0.9, 0.5]];
+    case 'forest': return [[0.3, 1.0, 0.6], [1.0, 0.3, 0.75], [1.0, 1.0, 0.5]];
+    case 'clouds': return [[1.0, 0.55, 0.4], [1.0, 0.3, 0.7], [1.0, 0.95, 0.6]];
+    case 'moon': return [[0.4, 0.75, 1.0], [0.8, 0.85, 1.0], [1.0, 0.95, 0.6]];
+    case 'galaxy': return [[1.0, 0.3, 0.8], [0.3, 0.8, 1.0], [1.0, 1.0, 0.6]];
     case 'terrain': return [[1.0, 0.45, 0.2], [1.0, 0.2, 0.6], [1.0, 0.95, 0.5]];
     case 'eq': return [[1.0, 0.2, 0.7], [1.0, 0.6, 0.1], [1.0, 1.0, 0.6]];
     case 'planet': return [[0.3, 0.7, 1.0], [0.7, 0.35, 1.0], [0.6, 1.0, 0.9]];
@@ -820,10 +1009,11 @@ function lyricColors(m) {
 // ------------------------------------------------------------------ frame assembly
 const BA = mkBuf(), BB = mkBuf();
 function secAt(t) { let k = 0; for (let i = 0; i < SEC.length; i++) if (SEC[i].t - TR_PRE <= t) k = i; return k; }
+const ENV0 = { fog: [0, 0, 0], fogD: 0.003, top: [0, 0, 0], hor: [0, 0, 0], stars: 1, aurora: 0, sun: 0, sunCol: [1, 0.5, 0.4], stripes: 1, ground: 0, gridCol: [0, 0, 0], cell: 4, seam: 0.5, lit: 0, exposure: 1, bloom: [0.6, 0.45, 0.85] };
 function evalMode(sec, t, buf) {
   const u = t - sec.t, M = MODES[sec.m], p = sec.p || {};
   M.fill.call(M, t, u, p, buf, sec);
-  return { cam: M.cam.call(M, t, u, p, sec), env: M.env.call(M, t, u, p, sec) };
+  return { cam: M.cam.call(M, t, u, p, sec), env: { ...ENV0, ...M.env.call(M, t, u, p, sec) } };
 }
 function lerpObj(a, b, q) {
   if (typeof a === 'number') return lerp(a, b, q);
@@ -888,7 +1078,7 @@ function update(t) {
   voxMat.uniforms.uCam.value.copy(camera.position); voxMat.uniforms.uTime.value = t;
   voxMat.uniforms.uLit.value = env.lit; voxMat.uniforms.uSeam.value = env.seam; voxMat.uniforms.uPulse.value = pl;
   skyMat.uniforms.uTop.value.set(...env.top); skyMat.uniforms.uHor.value.set(...env.hor);
-  skyMat.uniforms.uStars.value = env.stars; skyMat.uniforms.uAurora.value = env.aurora; skyMat.uniforms.uSun.value = env.sun; skyMat.uniforms.uTime.value = t;
+  skyMat.uniforms.uStars.value = env.stars; skyMat.uniforms.uAurora.value = env.aurora; skyMat.uniforms.uSun.value = env.sun; skyMat.uniforms.uSunCol.value.set(...env.sunCol); skyMat.uniforms.uStripes.value = env.stripes; skyMat.uniforms.uTime.value = t;
   sky.position.copy(camera.position);
   groundMat.uniforms.uGrid.value.set(...env.gridCol); groundMat.uniforms.uFog.value.copy(fog);
   groundMat.uniforms.uCam.value.copy(camera.position); groundMat.uniforms.uFogD.value = env.fogD;
@@ -943,7 +1133,7 @@ async function setup() {
   const vox = new THREE.Mesh(geo, voxMat); vox.frustumCulled = false; scene.add(vox);
 
   skyMat = new THREE.ShaderMaterial({ vertexShader: SKY_VS, fragmentShader: SKY_FS, side: THREE.BackSide, depthWrite: false,
-    uniforms: { uTop: { value: new THREE.Color() }, uHor: { value: new THREE.Color() }, uStars: { value: 1 }, uAurora: { value: 0 }, uSun: { value: 0 }, uTime: { value: 0 } } });
+    uniforms: { uTop: { value: new THREE.Color() }, uHor: { value: new THREE.Color() }, uStars: { value: 1 }, uAurora: { value: 0 }, uSun: { value: 0 }, uTime: { value: 0 }, uSunCol: { value: new THREE.Color() }, uStripes: { value: 1 } } });
   sky = new THREE.Mesh(new THREE.SphereGeometry(1000, 48, 24), skyMat); sky.renderOrder = -1; sky.frustumCulled = false; scene.add(sky);
 
   groundMat = new THREE.ShaderMaterial({ vertexShader: GROUND_VS, fragmentShader: GROUND_FS, transparent: true,
