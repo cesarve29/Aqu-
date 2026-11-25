@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Light Me Up - renderer</title>
+<style>
+  @font-face { font-family: 'Orbitron'; font-weight: 900; src: url('../fonts/orbitron-latin-900-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'Orbitron'; font-weight: 600; src: url('../fonts/orbitron-latin-600-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'Russo One'; font-weight: 400; src: url('../fonts/russo-one-latin-400-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'PressStart'; font-weight: 400; src: url('../fonts/press-start-2p-latin-400-normal.woff2') format('woff2'); }
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  canvas { display: block; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "../node_modules/three/build/three.module.js",
+  "three/addons/": "../node_modules/three/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<script type="module" src="./main.js"></script>
+</body>
+</html>

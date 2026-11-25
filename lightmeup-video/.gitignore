@@ -1,0 +1,6 @@
+node_modules/
+segs/
+song.mp3
+soundtrack.wav
+audio_features.json
+package-lock.json
